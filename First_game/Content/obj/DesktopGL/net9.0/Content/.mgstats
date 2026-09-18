@@ -1,0 +1,3 @@
+Source File,Dest File,Processor Type,Content Type,Source File Size,Dest File Size,Build Seconds
+"C:/Users/Athena Rylance/Documents/Game/First_game/Content/Images/logo.png","C:/Users/Athena Rylance/Documents/Game/First_game/Content/bin/DesktopGL/Content/Images/logo.xnb","TextureProcessor","Texture2DContent",16734,311381,0.1717766
+"C:/Users/Athena Rylance/Documents/Game/First_game/Content/Images/startercat.png","C:/Users/Athena Rylance/Documents/Game/First_game/Content/bin/DesktopGL/Content/Images/startercat.xnb","TextureProcessor","Texture2DContent",663836,15932821,0.4171158
