@@ -4,8 +4,8 @@
   <Platform>DesktopGL</Platform>
   <Config />
   <SourceFiles>
-    <File>C:/Users/Athena Rylance/Documents/Game/First_game/Content/Images/logo.png</File>
-    <File>C:/Users/Athena Rylance/Documents/Game/First_game/Content/Images/startercat.png</File>
+    <File>C:/Users/realt/OneDrive/Documents/OurGame/Game/First_game/Content/Images/logo.png</File>
+    <File>C:/Users/realt/OneDrive/Documents/OurGame/Game/First_game/Content/Images/startercat.png</File>
   </SourceFiles>
   <DestFiles>
     <File xsi:nil="true" />

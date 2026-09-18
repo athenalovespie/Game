@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PipelineBuildEvent xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <SourceFile>C:/Users/Athena Rylance/Documents/Game/First_game/Content/Images/startercat.png</SourceFile>
-  <SourceTime>2026-09-17T10:35:47.0434891-07:00</SourceTime>
-  <DestFile>C:/Users/Athena Rylance/Documents/Game/First_game/Content/bin/DesktopGL/Content/Images/startercat.xnb</DestFile>
-  <DestTime>2026-09-17T11:11:50.6556369-07:00</DestTime>
+  <SourceFile>C:/Users/realt/OneDrive/Documents/OurGame/Game/First_game/Content/Images/startercat.png</SourceFile>
+  <SourceTime>2026-09-18T12:24:12.9263578-07:00</SourceTime>
+  <DestFile>C:/Users/realt/OneDrive/Documents/OurGame/Game/First_game/Content/bin/DesktopGL/Content/Images/startercat.xnb</DestFile>
+  <DestTime>2026-09-18T12:29:23.7584315-07:00</DestTime>
   <Importer>TextureImporter</Importer>
   <ImporterTime>2026-08-14T14:50:10-07:00</ImporterTime>
   <Processor>TextureProcessor</Processor>

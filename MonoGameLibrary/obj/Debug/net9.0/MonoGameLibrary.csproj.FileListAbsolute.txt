@@ -10,3 +10,16 @@ C:\Users\Athena Rylance\Documents\Game\MonoGameLibrary\obj\Debug\net9.0\MonoGame
 C:\Users\Athena Rylance\Documents\Game\MonoGameLibrary\obj\Debug\net9.0\refint\MonoGameLibrary.dll
 C:\Users\Athena Rylance\Documents\Game\MonoGameLibrary\obj\Debug\net9.0\MonoGameLibrary.pdb
 C:\Users\Athena Rylance\Documents\Game\MonoGameLibrary\obj\Debug\net9.0\ref\MonoGameLibrary.dll
+C:\Users\realt\OneDrive\Documents\OurGame\Game\MonoGameLibrary\bin\Debug\net9.0\MonoGameLibrary.deps.json
+C:\Users\realt\OneDrive\Documents\OurGame\Game\MonoGameLibrary\bin\Debug\net9.0\MonoGameLibrary.dll
+C:\Users\realt\OneDrive\Documents\OurGame\Game\MonoGameLibrary\bin\Debug\net9.0\MonoGameLibrary.pdb
+C:\Users\realt\OneDrive\Documents\OurGame\Game\MonoGameLibrary\obj\Debug\net9.0\MonoGameLibrary.csproj.AssemblyReference.cache
+C:\Users\realt\OneDrive\Documents\OurGame\Game\MonoGameLibrary\obj\Debug\net9.0\MonoGameLibrary.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\realt\OneDrive\Documents\OurGame\Game\MonoGameLibrary\obj\Debug\net9.0\MonoGameLibrary.AssemblyInfoInputs.cache
+C:\Users\realt\OneDrive\Documents\OurGame\Game\MonoGameLibrary\obj\Debug\net9.0\MonoGameLibrary.AssemblyInfo.cs
+C:\Users\realt\OneDrive\Documents\OurGame\Game\MonoGameLibrary\obj\Debug\net9.0\MonoGameLibrary.csproj.CoreCompileInputs.cache
+C:\Users\realt\OneDrive\Documents\OurGame\Game\MonoGameLibrary\obj\Debug\net9.0\MonoGameLibrary.sourcelink.json
+C:\Users\realt\OneDrive\Documents\OurGame\Game\MonoGameLibrary\obj\Debug\net9.0\MonoGameLibrary.dll
+C:\Users\realt\OneDrive\Documents\OurGame\Game\MonoGameLibrary\obj\Debug\net9.0\refint\MonoGameLibrary.dll
+C:\Users\realt\OneDrive\Documents\OurGame\Game\MonoGameLibrary\obj\Debug\net9.0\MonoGameLibrary.pdb
+C:\Users\realt\OneDrive\Documents\OurGame\Game\MonoGameLibrary\obj\Debug\net9.0\ref\MonoGameLibrary.dll
