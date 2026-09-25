@@ -83,14 +83,14 @@ public class Game1 : Core
         cat = new Player(animations);
         cat.Position = new Vector2(100, 700);
         cat.Scale = 0.5f;
-        cat.Speed = 200f;
+        cat.Speed = 300f;
 
         for (int fishIndex = 0; fishIndex < 5; fishIndex++)
         {
             Vector2 fishPosition = new Vector2(
                 random.Next(-1000, 1201),
                 random.Next(-1000, 1201));
-            fish.Add(new WorldPickup(fishTexture, fishPosition, 0.5f));
+            fish.Add(new WorldPickup(fishTexture, fishPosition, 0.2f));
         }
         camera = new Camera2D(cat.Position);
 
