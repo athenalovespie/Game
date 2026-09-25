@@ -6,15 +6,27 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using MonoGameLibrary;
-
+using First_game.Entities;
+using MonoGameLibrary.Graphics;
+using System.Collections.Generic;
+using First_game.World;
 
 namespace First_game;
 
+
 public class Game1 : Core
 {
+    private Sprite background;
+    private Player cat;
 
-    private Texture2D _startercat;
-    private Vector2 _catPosition = new Vector2(640, 360);
+    private Camera2D camera;
+
+    private WorldPickup fish;
+
+    private Sprite House;
+    private Sprite Tent;
+
+    private MouseState _previousMouse;
     public Game1() : base("Game1" , 1280 , 720, false)
     {
 
@@ -22,45 +34,90 @@ public class Game1 : Core
 
     protected override void Initialize()
     {
-        // TODO: Add your initialization logic here
+        var display = GraphicsAdapter.DefaultAdapter.CurrentDisplayMode;
+
+        Graphics.PreferredBackBufferWidth = display.Width;
+        Graphics.PreferredBackBufferHeight = display.Height;
+        Graphics.IsFullScreen = true;
+        Graphics.ApplyChanges();
 
         base.Initialize();
     }
 
+
     protected override void LoadContent()
-    {
-        _startercat = Content.Load<Texture2D>("Images/startercat");
+    {   
+        var catTexture = Content.Load<Texture2D>("Images/startercat");
+        var mapTexture = Content.Load<Texture2D>("Images/grass");
+        var fishTexture = Content.Load<Texture2D>("Images/Fish");
+        var HouseTexture = Content.Load<Texture2D>("Images/House");
+        var TentTexture = Content.Load<Texture2D>("Images/Tent");
+
+        var walkTextureRight = Content.Load<Texture2D>("Images/Right_walk");
+        var walkTextureLeft = Content.Load<Texture2D>("Images/Left_walk");
+
+        var animations = new Dictionary<string, Animation>
+        {
+            { "WalkRight", new Animation(walkTextureRight, 9)  },
+            { "WalkLeft",  new Animation(walkTextureLeft, 9)  },
+            { "WalkDown",  new Animation(walkTextureRight, 9)  },
+            { "WalkUp",    new Animation(walkTextureLeft, 9)  },
+
+            { "Right_Idle", new Animation(
+                Content.Load<Texture2D>("Images/Right_Idle"), 2) { FrameDuration = 0.7f }},
+            { "Left_Idle", new Animation(
+                Content.Load<Texture2D>("Images/Left_Idle"), 2) { FrameDuration = 0.7f }},
+            { "Front_Idle", new Animation(
+                Content.Load<Texture2D>("Images/Front_Idle"), 2) { FrameDuration = 0.7f }},
+            { "Back_Idle", new Animation(
+                Content.Load<Texture2D>("Images/Back_Idle"), 2) { FrameDuration = 0.7f }}
+        };
+    
+        cat = new Player(animations);
+        cat.Position = new Vector2(100, 700);
+        cat.Scale = 1.0f;
+        cat.Speed = 200f;
+
+        fish = new WorldPickup(fishTexture, new Vector2(-1000, 700));
+        camera = new Camera2D(cat.Position);
+
+        House = new Sprite(HouseTexture);
+        House.Position = new Vector2(400, 100);
+        House.Scale = 0.4f;
+
+        Tent = new Sprite(TentTexture);
+        Tent.Position = new Vector2(-500, 2000);
+        Tent.Scale = 0.2f;
+    
+        background = new Sprite(mapTexture);
+        background.Scale = 1.0f;
+        background.Position = new Vector2(620, 360);
         // TODO: use this.Content to load your game content here
     }
 
     protected override void Update(GameTime gameTime)
     {
+        var currentMouse = Mouse.GetState();
+        bool rightClicked;
+        if (currentMouse.RightButton == ButtonState.Pressed && _previousMouse.RightButton == ButtonState.Released)
+        {
+            rightClicked = true;
+        }
+        else
+        {
+            rightClicked = false; 
+        }
+
         if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
             Exit();
 
-        // TODO: Add your update logic here
-        float seconds = (float)gameTime.ElapsedGameTime.TotalSeconds;
+        cat.Update(gameTime);
 
-        if (Keyboard.GetState().IsKeyDown(Keys.Right))
-        {
-            _catPosition.X += 200f*seconds;
-        }
+        camera.UpdateTarget(cat.Position);
+        camera.Update(gameTime);
 
-          if (Keyboard.GetState().IsKeyDown(Keys.Left))
-        {
-            _catPosition.X -= 200f*seconds;
-        }
+        _previousMouse = currentMouse;
 
-        if (Keyboard.GetState().IsKeyDown(Keys.Up))
-        {
-            _catPosition.Y -= 200f*seconds;
-        }
-
-        if (Keyboard.GetState().IsKeyDown(Keys.Down))
-        {
-            _catPosition.Y += 200f*seconds;
-        }
-        
         base.Update(gameTime);
     }
 
@@ -68,24 +125,17 @@ public class Game1 : Core
     {
         GraphicsDevice.Clear(Color.White);
 
+
+        Matrix transformMatrix = camera.GetTransform(GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
         // Begin the sprite batch to prepare for rendering.
-        SpriteBatch.Begin();
+        SpriteBatch.Begin(transformMatrix: transformMatrix);
 
-        //Draw the Logo Texture
-        SpriteBatch.Draw(
-            _startercat,                 // 1. Texture
-            _catPosition,                // 2. Position
-            null,                        // 3. Source rectangle
-            Color.White,                 // 4. Tint
-            0f,                          // 5. Rotation
-            new Vector2(
-                _startercat.Width * 0.5f,
-                _startercat.Height * 0.5f), // 6. Origin
-            0.25f,                       // 7. Scale
-            SpriteEffects.None,          // 8. Flip
-            0f                           // 9. Layer depth
-        );
-
+        background.Draw(SpriteBatch);
+        House.Draw(SpriteBatch);
+        Tent.Draw(SpriteBatch);
+        fish.Draw(SpriteBatch);
+        cat.Draw(SpriteBatch);
+   
         // Always end the sprite batch when finished.
         SpriteBatch.End();
 
