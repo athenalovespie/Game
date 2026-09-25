@@ -13,6 +13,11 @@
 
 #---------------------------------- Content ---------------------------------#
 
+#begin Fonts/UIFont.spritefont
+/importer:FontDescriptionImporter
+/processor:FontDescriptionProcessor
+/build:Fonts/UIFont.spritefont
+
 #begin Images/Back_Idle.png
 /importer:TextureImporter
 /processor:TextureProcessor

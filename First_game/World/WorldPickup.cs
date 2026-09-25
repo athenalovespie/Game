@@ -14,8 +14,20 @@ public class WorldPickup
 
     public bool IsCollected {get; private set; }
 
-    public WorldPickup(Texture2D texture, Vector2 initialPosition){
+    public bool TryCollect(Vector2 playerPosition, float pickupDistance)
+    {
+        if (IsCollected || !IsWithinReach(playerPosition, pickupDistance))
+        {
+            return false;
+        }
+
+        Collect();
+        return true;
+    }
+    
+    public WorldPickup(Texture2D texture, Vector2 initialPosition, float scale = 1f){
         pickupItem = new Sprite(texture);
+        pickupItem.Scale = scale;
         Position = initialPosition;
     }
 

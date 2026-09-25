@@ -8,6 +8,7 @@ using Microsoft.Xna.Framework.Input;
 using MonoGameLibrary;
 using First_game.Entities;
 using MonoGameLibrary.Graphics;
+using System;
 using System.Collections.Generic;
 using First_game.World;
 
@@ -19,9 +20,14 @@ public class Game1 : Core
     private Sprite background;
     private Player cat;
 
+    private int fishCollected;
+
+    private SpriteFont hudFont;
+
     private Camera2D camera;
 
-    private WorldPickup fish;
+    private readonly List<WorldPickup> fish = new List<WorldPickup>();
+    private readonly Random random = new Random();
 
     private Sprite House;
     private Sprite Tent;
@@ -50,6 +56,7 @@ public class Game1 : Core
         var catTexture = Content.Load<Texture2D>("Images/startercat");
         var mapTexture = Content.Load<Texture2D>("Images/grass");
         var fishTexture = Content.Load<Texture2D>("Images/Fish");
+        hudFont = Content.Load<SpriteFont>("Fonts/UIFont");
         var HouseTexture = Content.Load<Texture2D>("Images/House");
         var TentTexture = Content.Load<Texture2D>("Images/Tent");
 
@@ -75,15 +82,21 @@ public class Game1 : Core
     
         cat = new Player(animations);
         cat.Position = new Vector2(100, 700);
-        cat.Scale = 1.0f;
+        cat.Scale = 0.5f;
         cat.Speed = 200f;
 
-        fish = new WorldPickup(fishTexture, new Vector2(-1000, 700));
+        for (int fishIndex = 0; fishIndex < 5; fishIndex++)
+        {
+            Vector2 fishPosition = new Vector2(
+                random.Next(-1000, 1201),
+                random.Next(-1000, 1201));
+            fish.Add(new WorldPickup(fishTexture, fishPosition, 0.5f));
+        }
         camera = new Camera2D(cat.Position);
 
         House = new Sprite(HouseTexture);
         House.Position = new Vector2(400, 100);
-        House.Scale = 0.4f;
+        House.Scale = 0.3f;
 
         Tent = new Sprite(TentTexture);
         Tent.Position = new Vector2(-500, 2000);
@@ -113,6 +126,26 @@ public class Game1 : Core
 
         cat.Update(gameTime);
 
+        if (rightClicked)
+        {
+            Vector2 mouseWorldPosition = camera.ScreenToWorld(
+                currentMouse.Position.ToVector2(),
+                GraphicsDevice.Viewport.Width,
+                GraphicsDevice.Viewport.Height);
+
+            foreach (WorldPickup fishPickup in fish)
+            {
+                if (!fishPickup.IsCollected
+                    && fishPickup.IsWithinReach(cat.Position, 200f)
+                    && fishPickup.ContainsPoint(mouseWorldPosition))
+                {
+                    fishPickup.Collect();
+                    fishCollected++;
+                    break;
+                }
+            }
+        }
+
         camera.UpdateTarget(cat.Position);
         camera.Update(gameTime);
 
@@ -133,10 +166,17 @@ public class Game1 : Core
         background.Draw(SpriteBatch);
         House.Draw(SpriteBatch);
         Tent.Draw(SpriteBatch);
-        fish.Draw(SpriteBatch);
+        foreach (WorldPickup fishPickup in fish)
+        {
+            fishPickup.Draw(SpriteBatch);
+        }
         cat.Draw(SpriteBatch);
    
         // Always end the sprite batch when finished.
+        SpriteBatch.End();
+
+        SpriteBatch.Begin();
+        SpriteBatch.DrawString(hudFont, $"Fish: {fishCollected}", new Vector2(20, 20), Color.Black);
         SpriteBatch.End();
 
 
