@@ -81,7 +81,7 @@ public class Game1 : Core
         };
     
         cat = new Player(animations);
-        cat.Position = new Vector2(100, 700);
+        cat.Position = new Vector2(100, 1000);
         cat.Scale = 0.5f;
         cat.Speed = 300f;
 
@@ -124,7 +124,19 @@ public class Game1 : Core
         if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
             Exit();
 
+        Vector2 previousCatPosition = cat.Position;
         cat.Update(gameTime);
+
+        Rectangle houseBounds = new Rectangle(
+            (int)House.Position.X - 300,
+            (int)House.Position.Y - 150,
+            600,
+            300);
+
+        if (cat.Bounds.Intersects(houseBounds))
+        {
+            cat.Position = previousCatPosition;
+        }
 
         if (rightClicked)
         {

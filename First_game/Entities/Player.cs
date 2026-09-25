@@ -25,6 +25,23 @@ public class Player
     public float Speed;
     public float Scale;
 
+    public Rectangle Bounds
+    {
+        get
+        {
+            Rectangle source = _sprite.SourceRectangle
+                ?? new Rectangle(0, 0, _sprite.Texture.Width, _sprite.Texture.Height);
+            int width = (int)(source.Width * Scale);
+            int height = (int)(source.Height * Scale);
+
+            return new Rectangle(
+                (int)(Position.X - width * 0.5f),
+                (int)(Position.Y - height * 0.5f),
+                width,
+                height);
+        }
+    }
+
     private string _idleAnimation = "Right_Idle";
 
     public Vector2 Position
