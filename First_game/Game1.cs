@@ -18,6 +18,7 @@ namespace First_game;
 public class Game1 : Core
 {
     private Sprite background;
+    private Sprite Tree;
     private Player cat;
 
     private int fishCollected;
@@ -30,6 +31,8 @@ public class Game1 : Core
     private readonly Random random = new Random();
 
     private Sprite House;
+
+    private Obstacle houseObstacle;
     private Sprite Tent;
 
     private MouseState _previousMouse;
@@ -58,6 +61,7 @@ public class Game1 : Core
         var fishTexture = Content.Load<Texture2D>("Images/Fish");
         hudFont = Content.Load<SpriteFont>("Fonts/UIFont");
         var HouseTexture = Content.Load<Texture2D>("Images/House");
+        var TreeTexture = Content.Load<Texture2D>("Images/Tree");
         var TentTexture = Content.Load<Texture2D>("Images/Tent");
 
         var walkTextureRight = Content.Load<Texture2D>("Images/Right_walk");
@@ -81,7 +85,7 @@ public class Game1 : Core
         };
     
         cat = new Player(animations);
-        cat.Position = new Vector2(100, 1000);
+        cat.Position = new Vector2(100, 1200);
         cat.Scale = 0.5f;
         cat.Speed = 300f;
 
@@ -98,12 +102,18 @@ public class Game1 : Core
         House.Position = new Vector2(400, 100);
         House.Scale = 0.3f;
 
+        houseObstacle = new Obstacle(House, new Vector2(3750f, 1462f),new Vector2(-77.5f,1000.5f));
+
         Tent = new Sprite(TentTexture);
         Tent.Position = new Vector2(-500, 2000);
-        Tent.Scale = 0.2f;
+        Tent.Scale = 0.15f;
+
+        Tree = new Sprite(TreeTexture);
+        Tree.Position = new Vector2(-1000, 1800);
+        Tree.Scale = 0.2f;
     
         background = new Sprite(mapTexture);
-        background.Scale = 1.0f;
+        background.Scale = 2.0f;
         background.Position = new Vector2(620, 360);
         // TODO: use this.Content to load your game content here
     }
@@ -127,12 +137,8 @@ public class Game1 : Core
         Vector2 previousCatPosition = cat.Position;
         cat.Update(gameTime);
 
-        Rectangle houseBounds = new Rectangle(
-            (int)House.Position.X - 300,
-            (int)House.Position.Y - 150,
-            600,
-            300);
-
+        Rectangle houseBounds = houseObstacle.Bounds;
+   
         if (cat.Bounds.Intersects(houseBounds))
         {
             cat.Position = previousCatPosition;
@@ -178,6 +184,7 @@ public class Game1 : Core
         background.Draw(SpriteBatch);
         House.Draw(SpriteBatch);
         Tent.Draw(SpriteBatch);
+        Tree.Draw(SpriteBatch);
         foreach (WorldPickup fishPickup in fish)
         {
             fishPickup.Draw(SpriteBatch);
