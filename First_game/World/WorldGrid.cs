@@ -17,6 +17,8 @@ public class GridCell
 
     public object Occupant { get; set; }
 
+    public bool BlocksMovement { get; set; }
+
     public GridCell()
     {
         Type = CellType.Empty;
@@ -163,7 +165,8 @@ public class WorldGrid
     public bool Occupy(
         Point cell,
         CellType type,
-        object occupant = null)
+        object occupant = null,
+        bool? blocksMovement = null)
     {
         if (!CanPlace(cell))
         {
@@ -172,6 +175,8 @@ public class WorldGrid
 
         cells[cell.X, cell.Y].Type = type;
         cells[cell.X, cell.Y].Occupant = occupant;
+        cells[cell.X, cell.Y].BlocksMovement = blocksMovement
+            ?? (type == CellType.Plant || type == CellType.Building);
 
         return true;
     }
@@ -185,6 +190,29 @@ public class WorldGrid
 
         cells[cell.X, cell.Y].Type = CellType.Empty;
         cells[cell.X, cell.Y].Occupant = null;
+        cells[cell.X, cell.Y].BlocksMovement = false;
+    }
+
+    public bool IntersectsBlockedCell(Rectangle bounds)
+    {
+        if (bounds.Width <= 0 || bounds.Height <= 0)
+            return false;
+
+        Point first = WorldToCell(new Vector2(bounds.Left, bounds.Top));
+        // Rectangle's right and bottom edges are exclusive.
+        Point last = WorldToCell(new Vector2(bounds.Right - 1, bounds.Bottom - 1));
+
+        // Outside the grid remains walkable.
+        for (int x = Math.Max(0, first.X); x <= Math.Min(Columns - 1, last.X); x++)
+        {
+            for (int y = Math.Max(0, first.Y); y <= Math.Min(Rows - 1, last.Y); y++)
+            {
+                if (cells[x, y].BlocksMovement)
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     public bool CanPlaceArea(
@@ -216,7 +244,8 @@ public class WorldGrid
         int width,
         int height,
         CellType type,
-        object occupant = null)
+        object occupant = null,
+        bool? blocksMovement = null)
     {
         if (!CanPlaceArea(startingCell, width, height))
         {
@@ -234,6 +263,8 @@ public class WorldGrid
 
                 cells[cell.X, cell.Y].Type = type;
                 cells[cell.X, cell.Y].Occupant = occupant;
+                cells[cell.X, cell.Y].BlocksMovement = blocksMovement
+                    ?? (type == CellType.Plant || type == CellType.Building);
             }
         }
 

@@ -27,6 +27,8 @@ public class Player
     public Vector2 CollisionSize {get; set; }
     public Vector2 CollisionOffset {get; set; }
 
+    public Func<Rectangle, bool> IsMovementBlocked { get; set; }
+
     public Rectangle Bounds
     {
         get
@@ -86,7 +88,28 @@ public class Player
         _velocity *= Speed;
 
         float seconds = (float)gameTime.ElapsedGameTime.TotalSeconds;
-        Position += _velocity * seconds;
+        MoveBy(_velocity * seconds);
+    }
+
+    public void MoveBy(Vector2 movement)
+    {
+        // Small steps prevent crossing an obstacle during a long frame.
+        int steps = Math.Max(1, (int)MathF.Ceiling(
+            MathF.Max(MathF.Abs(movement.X), MathF.Abs(movement.Y))));
+        Vector2 step = movement / steps;
+
+        for (int i = 0; i < steps; i++)
+        {
+            Vector2 previous = Position;
+            Position += new Vector2(step.X, 0);
+            if (IsMovementBlocked?.Invoke(Bounds) == true)
+                Position = previous;
+
+            previous = Position;
+            Position += new Vector2(0, step.Y);
+            if (IsMovementBlocked?.Invoke(Bounds) == true)
+                Position = previous;
+        }
     }
 
     protected virtual void SetAnimations()

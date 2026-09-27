@@ -153,7 +153,38 @@ public class Game1 : Core
         cat.Speed = 300f;
         cat.CollisionSize = new Vector2(270, 64);
         cat.CollisionOffset = new Vector2(0, 331);
+        cat.IsMovementBlocked = bounds => worldGrid.IntersectsBlockedCell(bounds);
+            // || (houseObstacle != null && bounds.Intersects(houseObstacle.Bounds));
 
+
+        if (!gridPlacer.TryPlaceBuilding(
+            HouseTexture,
+            new Vector2(400, 150),
+            widthInCells: 11,
+            heightInCells: 4,
+            scale: 0.3f,
+            out House,
+            groundOffsetY: HouseTexture.Height / 2f - 200f,
+            groundOffsetX: 0f))
+            {
+            throw new InvalidOperationException(
+                "The house footprint is occupied or outside the grid.");
+
+        }
+        if (!gridPlacer.TryPlaceBuilding(
+            TentTexture,
+            new Vector2(-500, 2000),
+            widthInCells: 4,
+            heightInCells: 3,
+            scale: 0.15f,
+            out Tent,
+            groundOffsetY: TentTexture.Height / 2f - 667f,
+            groundOffsetX: 0f))
+            {
+            throw new InvalidOperationException(
+                "The house footprint is occupied or outside the grid.");
+
+        }
         for (int fishIndex = 0; fishIndex < 5; fishIndex++)
         {
             Vector2 fishPosition = new Vector2(
@@ -167,7 +198,9 @@ public class Game1 : Core
             Vector2 TreePosition = new Vector2(
                 random.Next(-3000, 2000),
                 random.Next(-3000, 2000));
-            if (gridPlacer.TryPlaceSprite(
+            if (PlantCellOverlapsPlayer(TreePosition))
+                continue;
+            if (gridPlacer.TryPlaceSprite( 
                 TreeTexture,
                 TreePosition,
                 CellType.Plant,
@@ -185,28 +218,24 @@ public class Game1 : Core
             Vector2 PinePosition = new Vector2(
                 random.Next(-3000, 2000),
                 random.Next(-3000, 2000));
+            if (PlantCellOverlapsPlayer(PinePosition))
+                continue;
             if (gridPlacer.TryPlaceSprite(
                 PineTexture,
                 PinePosition,
                 CellType.Plant,
                 0.2f,
-                out Sprite pine))
+                out Sprite pine,
+                groundOffsetY: PineTexture.Height / 2f,
+                groundOffsetX: -60f))
             {
                 pines.Add(pine);
             }
         }
         camera = new Camera2D(cat.Position);
 
-        House = new Sprite(HouseTexture);
-        House.Position = new Vector2(400, 100);
-        House.Scale = 0.3f;
-
-        houseObstacle = new Obstacle(House, new Vector2(3750f, 1462f),new Vector2(-77.5f,1000.5f));
-        House.GroundOffsetY = (houseObstacle.Bounds.Bottom - House.Position.Y) / House.Scale;
-
-        Tent = new Sprite(TentTexture);
-        Tent.Position = new Vector2(-500, 2000);
-        Tent.Scale = 0.15f;
+        // houseObstacle = new Obstacle(House, new Vector2(3750f, 1462f),new Vector2(-77.5f,1000.5f));
+        // House.GroundOffsetY = (houseObstacle.Bounds.Bottom - House.Position.Y) / House.Scale;
     
         background = new Sprite(mapTexture);
         background.Scale = 2.0f;
@@ -229,15 +258,7 @@ public class Game1 : Core
         if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
             Exit();
 
-        Vector2 previousCatPosition = cat.Position;
         cat.Update(gameTime);
-
-        Rectangle houseBounds = houseObstacle.Bounds;
-   
-        if (cat.Bounds.Intersects(houseBounds))
-        {
-            cat.Position = previousCatPosition;
-        }
 
         if (rightClicked)
         {
@@ -268,6 +289,13 @@ public class Game1 : Core
         _previousMouse = currentMouse;
 
         base.Update(gameTime);
+    }
+
+    private bool PlantCellOverlapsPlayer(Vector2 position)
+    {
+        Vector2 topLeft = worldGrid.CellToWorld(worldGrid.WorldToCell(position));
+        return cat.Bounds.Intersects(new Rectangle(
+            (int)topLeft.X, (int)topLeft.Y, worldGrid.CellSize, worldGrid.CellSize));
     }
 
     protected override void Draw(GameTime gameTime)
