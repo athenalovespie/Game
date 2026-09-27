@@ -29,6 +29,8 @@ public class Game1 : Core
     private readonly Random random = new Random();
     private Sprite House;
     private Sprite Tent;
+
+    private Sprite Lake;
     private MouseState _previousMouse;
     private KeyboardState _previousKeyboard;
     private GridPlacer gridPlacer;
@@ -133,6 +135,7 @@ public class Game1 : Core
         var TreeTexture = Content.Load<Texture2D>("Images/Tree");
         var PineTexture = Content.Load<Texture2D>("Images/Pine");
         var TentTexture = Content.Load<Texture2D>("Images/Tent");
+        var LakeTexture = Content.Load<Texture2D>("Images/Lake");
 
         var walkTextureRight = Content.Load<Texture2D>("Images/Right_walk");
         var walkTextureLeft = Content.Load<Texture2D>("Images/Left_walk");
@@ -162,7 +165,49 @@ public class Game1 : Core
         cat.CollisionOffset = new Vector2(0, 331);
         cat.IsMovementBlocked = bounds => worldGrid.IntersectsBlockedCell(bounds);
 
+        if (!gridPlacer.TryPlaceBuilding(
+            LakeTexture,
+            new Vector2(-2000, 1500),
+            widthInCells: 12,
+            heightInCells: 7,
+            scale: 0.4f,
+            out Lake,
+            groundOffsetY: LakeTexture.Height / 2f - 550f,
+            groundOffsetX: -100f))
+            {
+            throw new InvalidOperationException(
+                "The house footprint is occupied or outside the grid.");
 
+        }
+        string[] lakeShape =
+            {
+                "..XXXXXX....",
+                ".XXXXXXXXX..",
+                ".XXXXXXXXXX.",
+                "XXXXXXXXXXXX",
+                "XXXXXXXXXXXX",
+                ".XXXXXXXXXXX",
+                ".XXX....XXX."
+            };
+        // Use the same position passed to TryPlaceBuilding.
+        Point lakeStart = worldGrid.WorldToCell(
+            new Vector2(-2000, 1500));
+
+        for (int row = 0; row < lakeShape.Length; row++)
+        {
+            for (int column = 0; column < lakeShape[row].Length; column++)
+            {
+                if (lakeShape[row][column] == '.')
+                {
+                    Point cell = new Point(
+                        lakeStart.X + column,
+                        lakeStart.Y + row);
+
+                    worldGrid.ClearCell(cell);
+                }
+            }
+        }
+        
         if (!gridPlacer.TryPlaceBuilding(
             HouseTexture,
             new Vector2(400, 150),
@@ -351,6 +396,7 @@ public class Game1 : Core
         SpriteBatch.Begin(transformMatrix: transformMatrix);
 
         background.Draw(SpriteBatch);
+        Lake.Draw(SpriteBatch);
         worldRenderer.Submit(House.SortY, House.Draw);
         worldRenderer.Submit(Tent.SortY, Tent.Draw);
 
