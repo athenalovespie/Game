@@ -10,6 +10,10 @@ public class Sprite
     public Texture2D Texture {get; set; }
     public Vector2 Position;
     public float Scale {get; set; } = 1f;
+    // Unscaled pixels below the centered origin; null uses the frame's bottom.
+    public float? GroundOffsetY { get; set; }
+    public float SortY => Position.Y
+        + (GroundOffsetY ?? (SourceRectangle?.Height ?? Texture.Height) * 0.5f) * Scale;
     public float Speed = 200f;
 
     public Rectangle? SourceRectangle { get; set; }

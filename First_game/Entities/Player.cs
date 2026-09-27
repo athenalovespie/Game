@@ -24,21 +24,25 @@ public class Player
 
     public float Speed;
     public float Scale;
+    public Vector2 CollisionSize {get; set; }
+    public Vector2 CollisionOffset {get; set; }
 
     public Rectangle Bounds
     {
         get
         {
-            Rectangle source = _sprite.SourceRectangle
-                ?? new Rectangle(0, 0, _sprite.Texture.Width, _sprite.Texture.Height);
-            int width = (int)(source.Width * Scale);
-            int height = (int)(source.Height * Scale);
+            // Rectangle source = _sprite.SourceRectangle
+            //     ?? new Rectangle(0, 0, _sprite.Texture.Width, _sprite.Texture.Height);
+            float width = (CollisionSize.X * Scale);
+            float height = (CollisionSize.Y * Scale);
+
+            Vector2 collisionCenter = Position + CollisionOffset*Scale;
 
             return new Rectangle(
-                (int)(Position.X - width * 0.5f),
-                (int)(Position.Y - height * 0.5f),
-                width,
-                height);
+                (int)(collisionCenter.X - width * 0.5f),
+                (int)(collisionCenter.Y - height * 0.5f),
+                (int)width,
+                (int)height);
         }
     }
 
