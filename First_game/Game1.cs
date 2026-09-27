@@ -10,6 +10,8 @@ using System.Collections.Generic;
 using First_game.World;
 using InventoryRenderer = First_game.Inventory.Inventory;
 using FishItem = First_game.Inventory.FishItem;
+using InventoryItem = First_game.Inventory.Item;
+using WoodItem = First_game.Inventory.WoodItem;
 
 namespace First_game;
 
@@ -18,13 +20,14 @@ public class Game1 : Core
 {
     private Sprite background;
     private Player cat;
-    private int fishCollected;
     private readonly InventoryRenderer inventory = new InventoryRenderer();
     private FishItem fishItem;
+    private WoodItem woodItem;
     private SpriteFont hudFont;
     private Camera2D camera;
     private readonly WorldRenderer worldRenderer = new WorldRenderer();
     private readonly List<WorldPickup> fish = new List<WorldPickup>();
+    private readonly List<WorldPickup> wood = new List<WorldPickup>();
     private readonly List<Sprite> trees = new List<Sprite>();
     private readonly List<Sprite> pines = new List<Sprite>();
     private readonly Random random = new Random();
@@ -35,6 +38,7 @@ public class Game1 : Core
     private GridPlacer gridPlacer;
     private Texture2D gridPixel;
     private Texture2D fishTexture;
+    private Texture2D woodTexture;
     private bool inventoryOpen;
 
     public Game1() : base("Game1" , 1280 , 720, false)
@@ -48,7 +52,7 @@ public class Game1 : Core
     columnCount: 60,
     rowCount: 60);
 
-    private bool TryPlaceFish(Texture2D texture, Vector2 worldPosition)
+    private bool TryPlacePickup(List<WorldPickup> pickups, Texture2D texture, Vector2 worldPosition, float scale = 0.2f)
     {
     Point cell = worldGrid.WorldToCell(worldPosition);
 
@@ -59,14 +63,14 @@ public class Game1 : Core
 
     // Snap the fish to the center of its cell.
     Vector2 position = worldGrid.CellCenter(cell);
-    WorldPickup pickup = new WorldPickup(texture, position, 0.2f);
+    WorldPickup pickup = new WorldPickup(texture, position, scale);
 
     if (!worldGrid.Occupy(cell, CellType.Pickup, pickup))
     {
         return false;
     }
 
-    fish.Add(pickup);
+    pickups.Add(pickup);
     return true;
     }
 
@@ -124,7 +128,9 @@ public class Game1 : Core
         var catTexture = Content.Load<Texture2D>("Images/startercat");
         var mapTexture = Content.Load<Texture2D>("Images/grass");
         fishTexture = Content.Load<Texture2D>("Images/Fish");
+        woodTexture = Content.Load<Texture2D>("Images/wood");
         fishItem = new FishItem(fishTexture);
+        woodItem = new WoodItem(woodTexture);
         hudFont = Content.Load<SpriteFont>("Fonts/UIFont");
         var HouseTexture = Content.Load<Texture2D>("Images/House");
         var TreeTexture = Content.Load<Texture2D>("Images/Tree");
@@ -193,7 +199,22 @@ public class Game1 : Core
             Vector2 fishPosition = new Vector2(
                 random.Next(-1000, 1201),
                 random.Next(-1000, 1201));
-            TryPlaceFish(fishTexture, fishPosition);
+            TryPlacePickup(fish, fishTexture, fishPosition);
+        }
+
+        for (int woodIndex = 0; woodIndex < 5; woodIndex++)
+        {
+            bool placed = false;
+            for (int attempt = 0; attempt < 1000 && !placed; attempt++)
+            {
+                Vector2 woodPosition = new Vector2(
+                    random.Next(-1000, 1201),
+                    random.Next(-1000, 1201));
+                placed = TryPlacePickup(wood, woodTexture, woodPosition);
+            }
+
+            if (!placed)
+                throw new InvalidOperationException("Could not place all wood pickups on the world grid.");
         }
 
         for (int treeIndex = 0; treeIndex < 10; treeIndex++)
@@ -283,23 +304,8 @@ public class Game1 : Core
                 GraphicsDevice.Viewport.Width,
                 GraphicsDevice.Viewport.Height);
 
-            foreach (WorldPickup fishPickup in fish)
-            {
-                if (!fishPickup.IsCollected
-                    && fishPickup.IsWithinReach(cat.Position, 200f)
-                    && fishPickup.ContainsPoint(mouseWorldPosition))
-                {
-                    if (!inventory.TryAdd(fishItem))
-                        break;
-
-                    Point cell = worldGrid.WorldToCell(fishPickup.Position);
-                    worldGrid.ClearCell(cell);
-
-                    fishPickup.Collect();
-                    fishCollected++;
-                    break;
-                }
-            }
+            if (!TryCollectPickup(fish, fishItem, mouseWorldPosition))
+                TryCollectPickup(wood, woodItem, mouseWorldPosition);
         }
 
         camera.UpdateTarget(cat.Position);
@@ -309,6 +315,26 @@ public class Game1 : Core
         _previousKeyboard = currentKeyboard;
 
         base.Update(gameTime);
+    }
+
+    private bool TryCollectPickup(List<WorldPickup> pickups, InventoryItem item, Vector2 mouseWorldPosition)
+    {
+        foreach (WorldPickup pickup in pickups)
+        {
+            if (pickup.IsCollected
+                || !pickup.IsWithinReach(cat.Position, 200f)
+                || !pickup.ContainsPoint(mouseWorldPosition)
+                || !inventory.TryAdd(item))
+                continue;
+
+            Point cell = worldGrid.WorldToCell(pickup.Position);
+            worldGrid.ClearCell(cell);
+            pickup.Collect();
+
+            return true;
+        }
+
+        return false;
     }
 
     private bool PlantCellOverlapsPlayer(Vector2 position)
@@ -347,6 +373,12 @@ public class Game1 : Core
                 worldRenderer.Submit(fishPickup.Position.Y, fishPickup.Draw);
         }
 
+        foreach (WorldPickup woodPickup in wood)
+        {
+            if (!woodPickup.IsCollected)
+                worldRenderer.Submit(woodPickup.Position.Y, woodPickup.Draw);
+        }
+
         // Submit the player last so it draws in front when ground positions tie.
         worldRenderer.Submit(cat.Bounds.Bottom, cat.Draw);
         worldRenderer.Draw(SpriteBatch);
@@ -356,7 +388,6 @@ public class Game1 : Core
         SpriteBatch.End();
 
         SpriteBatch.Begin();
-        SpriteBatch.DrawString(hudFont, $"Fish: {fishCollected}", new Vector2(20, 20), Color.Black);
         if (inventoryOpen)
             inventory.Draw(
                 SpriteBatch,
