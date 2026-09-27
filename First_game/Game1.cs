@@ -1,7 +1,4 @@
-﻿// using System.Numerics;
-// using System.Runtime.Intrinsics;
-// using System.Security.Cryptography;
-// using System.Drawing;
+﻿
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -28,7 +25,6 @@ public class Game1 : Core
     private readonly List<Sprite> pines = new List<Sprite>();
     private readonly Random random = new Random();
     private Sprite House;
-    private Obstacle houseObstacle;
     private Sprite Tent;
     private MouseState _previousMouse;
     private GridPlacer gridPlacer;
@@ -154,7 +150,6 @@ public class Game1 : Core
         cat.CollisionSize = new Vector2(270, 64);
         cat.CollisionOffset = new Vector2(0, 331);
         cat.IsMovementBlocked = bounds => worldGrid.IntersectsBlockedCell(bounds);
-            // || (houseObstacle != null && bounds.Intersects(houseObstacle.Bounds));
 
 
         if (!gridPlacer.TryPlaceBuilding(
@@ -174,7 +169,7 @@ public class Game1 : Core
         if (!gridPlacer.TryPlaceBuilding(
             TentTexture,
             new Vector2(-500, 2000),
-            widthInCells: 4,
+            widthInCells: 5,
             heightInCells: 3,
             scale: 0.15f,
             out Tent,
