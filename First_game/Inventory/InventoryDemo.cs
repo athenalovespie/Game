@@ -16,16 +16,16 @@ public static class InventoryDemo
 			throw new InvalidOperationException("The sample items did not fit in the inventory.");
 
 		inventory.MoveItem(2, 5);
-		if (inventory.AddItem("(O)copper_ore") != 1 || !inventory.TryUseItem(2, new DemoUseContext()))
-			throw new InvalidOperationException("The copper buff effect did not execute.");
-		if (inventory.AddItem("(O)copper_ore") != 1)
-			throw new InvalidOperationException("The copper item did not fit after use.");
+		if (inventory.AddItem("(O)blackberry") != 1 || !inventory.TryUseItem(2, new DemoUseContext()))
+			throw new InvalidOperationException("The blackberry restore effect did not execute.");
+		if (inventory.AddItem("(O)blackberry") != 1)
+			throw new InvalidOperationException("The blackberry did not fit after use.");
 
 		string saveJson = inventory.SaveToJson();
 		Inventory restored = Inventory.LoadFromJson(saveJson, definitions, behaviors);
 		if (restored.GetItemCount("(O)wood") != 150
 			|| restored.GetItemCount("(C)parsnip") != 23
-			|| restored.GetItemCount("(O)copper_ore") != 1)
+			|| restored.GetItemCount("(O)blackberry") != 1)
 			throw new InvalidOperationException("The inventory save/load round trip failed.");
 		return restored;
 	}

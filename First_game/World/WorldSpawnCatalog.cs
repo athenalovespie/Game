@@ -13,8 +13,8 @@ public static class WorldSpawnCatalog
 			"wood_pile_drop", "wood_pile", "(O)wood", chance: 1f,
 			minimumCount: 1, maximumCount: 1, respawnSeconds: 60d));
 		rules.Register(new WorldSpawnRule(
-			"copper_vein_drop", "copper_vein", "(O)copper_ore", chance: 0.85f,
-			minimumCount: 1, maximumCount: 2, respawnSeconds: 90d));
+			"blackberry_bush_drop", "blackberry_bush", "(O)blackberry", chance: 0.85f,
+			minimumCount: 1, maximumCount: 3, respawnSeconds: 90d));
 	}
 
 	public static SpawnNodeConfig[] CreateNodes()
@@ -23,7 +23,7 @@ public static class WorldSpawnCatalog
 		{
 			new SpawnNodeConfig("fish_spot", 5, new Vector2(-1000, -1000), new Vector2(1200, 1200)),
 			new SpawnNodeConfig("wood_pile", 5, new Vector2(-1000, -1000), new Vector2(1200, 1200)),
-			new SpawnNodeConfig("copper_vein", 1, new Vector2(700, 1100), new Vector2(700, 1100))
+			new SpawnNodeConfig("blackberry_bush", 5, new Vector2(-600, 400), new Vector2(1200, 1600))
 		};
 	}
 }

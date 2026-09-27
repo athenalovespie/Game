@@ -15,10 +15,10 @@ public static class SampleItemCatalog
 			spawnerRuleId: "fish_spot_drop", useEffectId: "restore_vitals",
 			effectAmount: 5f, effectSecondaryAmount: 5f));
 		definitions.Register(new ItemDefinition(
-			"(O)copper_ore", "Copper Ore", "Ore from a copper vein.", "Images/wood",
-			ItemCategory.Resource, maxStackSize: 99, basePrice: 25, isUsable: true,
-			spawnerRuleId: "copper_vein_drop", useEffectId: "apply_buff",
-			effectAmount: 1f, effectDurationSeconds: 15f, effectTargetId: "mining_luck"));
+			"(O)blackberry", "Blackberry", "A dark, juicy berry.", "Images/Blackberry",
+			ItemCategory.Food, maxStackSize: 99, basePrice: 20, isEdible: true, isUsable: true,
+			spawnerRuleId: "blackberry_bush_drop", useEffectId: "restore_vitals",
+			effectAmount: 3f, effectSecondaryAmount: 5f));
 		definitions.Register(new ItemDefinition(
 			"(C)parsnip", "Parsnip", "A root vegetable.", null,
 			ItemCategory.Crop, maxStackSize: 10, basePrice: 35));
