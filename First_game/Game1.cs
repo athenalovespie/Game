@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using First_game.World;
 using InventoryRenderer = First_game.Inventory.Inventory;
+using FishItem = First_game.Inventory.FishItem;
 
 namespace First_game;
 
@@ -18,6 +19,8 @@ public class Game1 : Core
     private Sprite background;
     private Player cat;
     private int fishCollected;
+    private readonly InventoryRenderer inventory = new InventoryRenderer();
+    private FishItem fishItem;
     private SpriteFont hudFont;
     private Camera2D camera;
     private readonly WorldRenderer worldRenderer = new WorldRenderer();
@@ -121,6 +124,7 @@ public class Game1 : Core
         var catTexture = Content.Load<Texture2D>("Images/startercat");
         var mapTexture = Content.Load<Texture2D>("Images/grass");
         fishTexture = Content.Load<Texture2D>("Images/Fish");
+        fishItem = new FishItem(fishTexture);
         hudFont = Content.Load<SpriteFont>("Fonts/UIFont");
         var HouseTexture = Content.Load<Texture2D>("Images/House");
         var TreeTexture = Content.Load<Texture2D>("Images/Tree");
@@ -285,6 +289,9 @@ public class Game1 : Core
                     && fishPickup.IsWithinReach(cat.Position, 200f)
                     && fishPickup.ContainsPoint(mouseWorldPosition))
                 {
+                    if (!inventory.TryAdd(fishItem))
+                        break;
+
                     Point cell = worldGrid.WorldToCell(fishPickup.Position);
                     worldGrid.ClearCell(cell);
 
@@ -351,12 +358,10 @@ public class Game1 : Core
         SpriteBatch.Begin();
         SpriteBatch.DrawString(hudFont, $"Fish: {fishCollected}", new Vector2(20, 20), Color.Black);
         if (inventoryOpen)
-            InventoryRenderer.Draw(
+            inventory.Draw(
                 SpriteBatch,
                 gridPixel,
                 hudFont,
-                fishTexture,
-                fishCollected,
                 GraphicsDevice.Viewport.Width,
                 GraphicsDevice.Viewport.Height);
         SpriteBatch.End();

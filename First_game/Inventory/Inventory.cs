@@ -4,14 +4,71 @@ using Microsoft.Xna.Framework.Graphics;
 
 namespace First_game.Inventory;
 
-public static class Inventory
+public sealed class Inventory
 {
-	public static void Draw(
+	public const int Rows = 3;
+	public const int Columns = 9;
+	private readonly ItemInstance[,] _slots = new ItemInstance[Rows, Columns];
+
+	public bool TryAdd(Item item, int quantity = 1)
+	{
+		if (item == null)
+			throw new ArgumentNullException(nameof(item));
+		if (quantity < 1)
+			throw new ArgumentOutOfRangeException(nameof(quantity));
+
+		long availableCapacity = 0;
+		for (int row = 0; row < Rows; row++)
+		{
+			for (int column = 0; column < Columns; column++)
+			{
+				ItemInstance slot = _slots[row, column];
+				if (slot == null)
+					availableCapacity += item.MaxStack;
+				else if (string.Equals(slot.Item.Id, item.Id, StringComparison.Ordinal))
+					availableCapacity += item.MaxStack - slot.Quantity;
+			}
+		}
+
+		if (availableCapacity < quantity)
+			return false;
+
+		int remaining = quantity;
+		for (int row = 0; row < Rows && remaining > 0; row++)
+		{
+			for (int column = 0; column < Columns && remaining > 0; column++)
+			{
+				ItemInstance slot = _slots[row, column];
+				if (slot != null && string.Equals(slot.Item.Id, item.Id, StringComparison.Ordinal))
+					remaining = slot.AddQuantity(remaining);
+			}
+		}
+
+		for (int row = 0; row < Rows && remaining > 0; row++)
+		{
+			for (int column = 0; column < Columns && remaining > 0; column++)
+			{
+				if (_slots[row, column] != null)
+					continue;
+
+				int stackQuantity = Math.Min(remaining, item.MaxStack);
+				_slots[row, column] = new ItemInstance(item, stackQuantity);
+				remaining -= stackQuantity;
+			}
+		}
+
+		return remaining == 0;
+	}
+
+	public ItemInstance GetSlot(int row, int column)
+	{
+		return _slots[row, column];
+	}
+
+	public void Draw(
 		SpriteBatch spriteBatch,
 		Texture2D pixel,
 		SpriteFont font,
-		Texture2D fishTexture,
-		int fishCollected,
 		int viewportWidth,
 		int viewportHeight)
 	{
@@ -29,29 +86,32 @@ public static class Inventory
 
 		int gridX = panelX + (panelWidth - (9 * slotSize + 8 * slotGap)) / 2;
 		int gridY = panelY + 54;
-		for (int row = 0; row < 3; row++)
+		for (int row = 0; row < Rows; row++)
 		{
-			for (int column = 0; column < 9; column++)
+			for (int column = 0; column < Columns; column++)
 			{
 				int slotX = gridX + column * (slotSize + slotGap);
 				int slotY = gridY + row * (slotSize + slotGap);
 				spriteBatch.Draw(pixel, new Rectangle(slotX, slotY, slotSize, slotSize), new Color(20, 23, 20));
 				spriteBatch.Draw(pixel, new Rectangle(slotX + 2, slotY + 2, slotSize - 4, slotSize - 4), new Color(77, 79, 64));
 
-				if (row == 0 && column == 0 && fishCollected > 0)
-				{
-					int iconSize = 26;
-					float scale = Math.Min(iconSize / (float)fishTexture.Width, iconSize / (float)fishTexture.Height);
-					int iconWidth = (int)(fishTexture.Width * scale);
-					int iconHeight = (int)(fishTexture.Height * scale);
-					var iconBounds = new Rectangle(
-						slotX + (slotSize - iconWidth) / 2,
-						slotY + (slotSize - iconHeight) / 2,
-						iconWidth,
-						iconHeight);
-					spriteBatch.Draw(fishTexture, iconBounds, Color.White);
-					spriteBatch.DrawString(font, fishCollected.ToString(), new Vector2(slotX + 24, slotY + 22), Color.White);
-				}
+				ItemInstance itemInstance = _slots[row, column];
+				if (itemInstance == null)
+					continue;
+
+				Texture2D icon = itemInstance.Item.Icon;
+				int iconSize = 26;
+				float scale = Math.Min(iconSize / (float)icon.Width, iconSize / (float)icon.Height);
+				int iconWidth = (int)(icon.Width * scale);
+				int iconHeight = (int)(icon.Height * scale);
+				var iconBounds = new Rectangle(
+					slotX + (slotSize - iconWidth) / 2,
+					slotY + (slotSize - iconHeight) / 2,
+					iconWidth,
+					iconHeight);
+				spriteBatch.Draw(icon, iconBounds, Color.White);
+				if (itemInstance.Quantity > 1)
+					spriteBatch.DrawString(font, itemInstance.Quantity.ToString(), new Vector2(slotX + 24, slotY + 22), Color.White);
 			}
 		}
 	}
