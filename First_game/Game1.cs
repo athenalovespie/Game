@@ -177,7 +177,7 @@ public class Game1 : Core
             scale: 0.15f,
             out Tent,
             groundOffsetY: TentTexture.Height / 2f - 667f,
-            groundOffsetX: 0f))
+            groundOffsetX: -200f))
             {
             throw new InvalidOperationException(
                 "The house footprint is occupied or outside the grid.");
@@ -204,7 +204,7 @@ public class Game1 : Core
                 CellType.Plant,
                 0.2f,
                 out Sprite tree,
-                groundOffsetY: TreeTexture.Height / 2f,
+                groundOffsetY: TreeTexture.Height / 2f - 100f,
                 groundOffsetX: -447.5f))
             {
                 trees.Add(tree);
@@ -224,7 +224,7 @@ public class Game1 : Core
                 CellType.Plant,
                 0.2f,
                 out Sprite pine,
-                groundOffsetY: PineTexture.Height / 2f,
+                groundOffsetY: PineTexture.Height / 2f -100f,
                 groundOffsetX: -60f))
             {
                 pines.Add(pine);
