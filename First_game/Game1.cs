@@ -9,9 +9,7 @@ using System;
 using System.Collections.Generic;
 using First_game.World;
 using InventoryRenderer = First_game.Inventory.Inventory;
-using FishItem = First_game.Inventory.FishItem;
-using InventoryItem = First_game.Inventory.Item;
-using WoodItem = First_game.Inventory.WoodItem;
+using First_game.Inventory;
 
 namespace First_game;
 
@@ -20,9 +18,7 @@ public class Game1 : Core
 {
     private Sprite background;
     private Player cat;
-    private readonly InventoryRenderer inventory = new InventoryRenderer();
-    private FishItem fishItem;
-    private WoodItem woodItem;
+    private InventoryRenderer inventory;
     private SpriteFont hudFont;
     private Camera2D camera;
     private readonly WorldRenderer worldRenderer = new WorldRenderer();
@@ -129,8 +125,9 @@ public class Game1 : Core
         var mapTexture = Content.Load<Texture2D>("Images/grass");
         fishTexture = Content.Load<Texture2D>("Images/Fish");
         woodTexture = Content.Load<Texture2D>("Images/wood");
-        fishItem = new FishItem(fishTexture);
-        woodItem = new WoodItem(woodTexture);
+        ItemDefinitionRegistry itemDefinitions = SampleItemCatalog.CreateDefinitions();
+        ItemCategoryBehaviorRegistry itemBehaviors = SampleItemCatalog.CreateBehaviors();
+        inventory = new InventoryRenderer(itemDefinitions, itemBehaviors);
         hudFont = Content.Load<SpriteFont>("Fonts/UIFont");
         var HouseTexture = Content.Load<Texture2D>("Images/House");
         var TreeTexture = Content.Load<Texture2D>("Images/Tree");
@@ -304,8 +301,8 @@ public class Game1 : Core
                 GraphicsDevice.Viewport.Width,
                 GraphicsDevice.Viewport.Height);
 
-            if (!TryCollectPickup(fish, fishItem, mouseWorldPosition))
-                TryCollectPickup(wood, woodItem, mouseWorldPosition);
+            if (!TryCollectPickup(fish, "(O)fish", mouseWorldPosition))
+                TryCollectPickup(wood, "(O)wood", mouseWorldPosition);
         }
 
         camera.UpdateTarget(cat.Position);
@@ -317,14 +314,14 @@ public class Game1 : Core
         base.Update(gameTime);
     }
 
-    private bool TryCollectPickup(List<WorldPickup> pickups, InventoryItem item, Vector2 mouseWorldPosition)
+    private bool TryCollectPickup(List<WorldPickup> pickups, string qualifiedId, Vector2 mouseWorldPosition)
     {
         foreach (WorldPickup pickup in pickups)
         {
             if (pickup.IsCollected
                 || !pickup.IsWithinReach(cat.Position, 200f)
                 || !pickup.ContainsPoint(mouseWorldPosition)
-                || !inventory.TryAdd(item))
+                || inventory.AddItem(qualifiedId) != 1)
                 continue;
 
             Point cell = worldGrid.WorldToCell(pickup.Position);
@@ -393,6 +390,7 @@ public class Game1 : Core
                 SpriteBatch,
                 gridPixel,
                 hudFont,
+                assetName => Content.Load<Texture2D>(assetName),
                 GraphicsDevice.Viewport.Width,
                 GraphicsDevice.Viewport.Height);
         SpriteBatch.End();
