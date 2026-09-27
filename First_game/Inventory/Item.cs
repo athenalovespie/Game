@@ -24,7 +24,13 @@ public sealed class ItemDefinition
 		int maxStackSize,
 		int basePrice,
 		bool isEdible = false,
-		bool isUsable = false)
+		bool isUsable = false,
+		string spawnerRuleId = null,
+		string useEffectId = null,
+		float effectAmount = 0f,
+		float effectSecondaryAmount = 0f,
+		float effectDurationSeconds = 0f,
+		string effectTargetId = null)
 	{
 		if (string.IsNullOrWhiteSpace(qualifiedId)
 			|| qualifiedId[0] != '('
@@ -47,6 +53,12 @@ public sealed class ItemDefinition
 		BasePrice = basePrice;
 		IsEdible = isEdible;
 		IsUsable = isUsable;
+		SpawnerRuleId = string.IsNullOrWhiteSpace(spawnerRuleId) ? null : spawnerRuleId;
+		UseEffectId = string.IsNullOrWhiteSpace(useEffectId) ? null : useEffectId;
+		EffectAmount = effectAmount;
+		EffectSecondaryAmount = effectSecondaryAmount;
+		EffectDurationSeconds = effectDurationSeconds;
+		EffectTargetId = string.IsNullOrWhiteSpace(effectTargetId) ? null : effectTargetId;
 	}
 
 	public string QualifiedId { get; }
@@ -58,4 +70,16 @@ public sealed class ItemDefinition
 	public int BasePrice { get; }
 	public bool IsEdible { get; }
 	public bool IsUsable { get; }
+	public string SpawnerRuleId { get; }
+	public string UseEffectId { get; }
+	public float EffectAmount { get; }
+	public float EffectSecondaryAmount { get; }
+	public float EffectDurationSeconds { get; }
+	public string EffectTargetId { get; }
+	public IItemUseEffect ResolvedUseEffect { get; private set; }
+
+	internal void BindUseEffect(IItemUseEffect effect)
+	{
+		ResolvedUseEffect = effect;
+	}
 }

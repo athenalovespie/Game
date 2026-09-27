@@ -24,10 +24,23 @@ public sealed class ItemInstance
 		Durability = durability;
 	}
 
+	private string _countText;
+	private int _count;
+
 	public string QualifiedId { get; }
-	public int Count { get; internal set; }
+	public int Count
+	{
+		get => _count;
+		internal set
+		{
+			_countText = null;
+			_count = value;
+		}
+	}
 	public int Quality { get; }
 	public int? Durability { get; private set; }
+	[JsonIgnore]
+	public string CountText => _countText ??= Count.ToString();
 
 	public void SetDurability(int? durability)
 	{
@@ -37,3 +50,5 @@ public sealed class ItemInstance
 		Durability = durability;
 	}
 }
+
+public readonly record struct ItemStackKey(string QualifiedId, int Quality, int? Durability);

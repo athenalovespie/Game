@@ -3,25 +3,11 @@ using System.Collections.Generic;
 
 namespace First_game.Inventory;
 
-public enum ItemUseOutcome
-{
-	Failed,
-	Used,
-	Consumed
-}
-
-public interface IItemUseContext
-{
-	ItemUseOutcome UseFood(ItemDefinition definition, ItemInstance instance);
-	ItemUseOutcome UseTool(ItemDefinition definition, ItemInstance instance);
-	ItemUseOutcome UseWeapon(ItemDefinition definition, ItemInstance instance);
-}
-
 public interface IItemCategoryBehavior
 {
 	int GetMaxStackSize(ItemDefinition definition);
-	bool CanStack(ItemDefinition definition, ItemInstance existing, ItemInstance incoming);
-	ItemUseOutcome TryUse(ItemDefinition definition, ItemInstance instance, IItemUseContext context);
+	bool CanStack(ItemDefinition definition, ItemInstance existing, ItemStackKey incoming);
+	IItemUseEffect ResolveDefaultUseEffect(ItemDefinition definition, UseEffectRegistry effects);
 }
 
 public class StackableItemBehavior : IItemCategoryBehavior
@@ -31,62 +17,60 @@ public class StackableItemBehavior : IItemCategoryBehavior
 		return definition.MaxStackSize;
 	}
 
-	public virtual bool CanStack(ItemDefinition definition, ItemInstance existing, ItemInstance incoming)
+	public virtual bool CanStack(ItemDefinition definition, ItemInstance existing, ItemStackKey incoming)
 	{
 		return string.Equals(existing.QualifiedId, incoming.QualifiedId, StringComparison.Ordinal)
 			&& existing.Quality == incoming.Quality
 			&& existing.Durability == incoming.Durability;
 	}
 
-	public virtual ItemUseOutcome TryUse(ItemDefinition definition, ItemInstance instance, IItemUseContext context)
+	public virtual IItemUseEffect ResolveDefaultUseEffect(ItemDefinition definition, UseEffectRegistry effects)
 	{
-		return ItemUseOutcome.Failed;
+		return null;
 	}
 }
 
 public sealed class FoodItemBehavior : StackableItemBehavior
 {
-	public override ItemUseOutcome TryUse(ItemDefinition definition, ItemInstance instance, IItemUseContext context)
+	public override IItemUseEffect ResolveDefaultUseEffect(ItemDefinition definition, UseEffectRegistry effects)
 	{
-		if (!definition.IsEdible || context == null)
-			return ItemUseOutcome.Failed;
-		return context.UseFood(definition, instance);
+		return definition.IsEdible ? effects.Resolve("restore_vitals", definition) : null;
 	}
 }
 
-public sealed class ToolItemBehavior : StackableItemBehavior
+public class ToolItemBehavior : StackableItemBehavior
 {
 	public override int GetMaxStackSize(ItemDefinition definition)
 	{
 		return 1;
 	}
 
-	public override bool CanStack(ItemDefinition definition, ItemInstance existing, ItemInstance incoming)
+	public override bool CanStack(ItemDefinition definition, ItemInstance existing, ItemStackKey incoming)
 	{
 		return false;
 	}
 
-	public override ItemUseOutcome TryUse(ItemDefinition definition, ItemInstance instance, IItemUseContext context)
+	public override IItemUseEffect ResolveDefaultUseEffect(ItemDefinition definition, UseEffectRegistry effects)
 	{
-		return context == null ? ItemUseOutcome.Failed : context.UseTool(definition, instance);
+		return definition.IsUsable ? effects.Resolve("tool_action", definition) : null;
 	}
 }
 
-public sealed class WeaponItemBehavior : StackableItemBehavior
+public sealed class WeaponItemBehavior : ToolItemBehavior
 {
-	public override int GetMaxStackSize(ItemDefinition definition)
+	public override IItemUseEffect ResolveDefaultUseEffect(ItemDefinition definition, UseEffectRegistry effects)
 	{
-		return 1;
+		return definition.IsUsable ? effects.Resolve("weapon_action", definition) : null;
 	}
+}
 
-	public override bool CanStack(ItemDefinition definition, ItemInstance existing, ItemInstance incoming)
-	{
-		return false;
-	}
+public sealed class FurnitureItemBehavior : StackableItemBehavior
+{
+	public override int GetMaxStackSize(ItemDefinition definition) => 1;
 
-	public override ItemUseOutcome TryUse(ItemDefinition definition, ItemInstance instance, IItemUseContext context)
+	public override IItemUseEffect ResolveDefaultUseEffect(ItemDefinition definition, UseEffectRegistry effects)
 	{
-		return context == null ? ItemUseOutcome.Failed : context.UseWeapon(definition, instance);
+		return definition.IsUsable ? effects.Resolve("place_object", definition) : null;
 	}
 }
 
@@ -103,7 +87,7 @@ public sealed class ItemCategoryBehaviorRegistry
 		Register(ItemCategory.Tool, new ToolItemBehavior());
 		Register(ItemCategory.Weapon, new WeaponItemBehavior());
 		Register(ItemCategory.Clothing, new StackableItemBehavior());
-		Register(ItemCategory.Furniture, new StackableItemBehavior());
+		Register(ItemCategory.Furniture, new FurnitureItemBehavior());
 	}
 
 	public void Register(ItemCategory category, IItemCategoryBehavior behavior)
@@ -116,5 +100,12 @@ public sealed class ItemCategoryBehaviorRegistry
 		if (!_behaviors.TryGetValue(category, out IItemCategoryBehavior behavior))
 			throw new KeyNotFoundException($"No behavior is registered for category '{category}'.");
 		return behavior;
+	}
+
+	public IItemUseEffect ResolveUseEffect(ItemDefinition definition, UseEffectRegistry effects)
+	{
+		if (definition.UseEffectId != null)
+			return effects.Resolve(definition);
+		return GetRequired(definition.Category).ResolveDefaultUseEffect(definition, effects);
 	}
 }

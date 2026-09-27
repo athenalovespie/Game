@@ -26,4 +26,17 @@ public sealed class ItemDefinitionRegistry
 	{
 		return _definitions.TryGetValue(qualifiedId, out definition);
 	}
+
+	public void ResolveUseEffects(UseEffectRegistry effects, ItemCategoryBehaviorRegistry behaviors)
+	{
+		if (effects == null)
+			throw new ArgumentNullException(nameof(effects));
+		if (behaviors == null)
+			throw new ArgumentNullException(nameof(behaviors));
+
+		foreach (ItemDefinition definition in _definitions.Values)
+			definition.BindUseEffect(behaviors.ResolveUseEffect(definition, effects));
+	}
+
+	public IEnumerable<ItemDefinition> All => _definitions.Values;
 }

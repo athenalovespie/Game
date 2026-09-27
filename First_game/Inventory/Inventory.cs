@@ -35,7 +35,7 @@ public sealed class Inventory
 		if (count < 1)
 			throw new ArgumentOutOfRangeException(nameof(count));
 		ItemDefinition definition = _definitions.GetRequired(qualifiedId);
-		var incoming = new ItemInstance(qualifiedId, 1, quality, durability);
+		var incoming = new ItemStackKey(qualifiedId, quality, durability);
 		IItemCategoryBehavior behavior = _behaviors.GetRequired(definition.Category);
 		int stackLimit = GetStackLimit(definition, behavior);
 		int remaining = count;
@@ -107,7 +107,7 @@ public sealed class Inventory
 
 		ItemDefinition definition = _definitions.GetRequired(source.QualifiedId);
 		IItemCategoryBehavior behavior = _behaviors.GetRequired(definition.Category);
-		if (behavior.CanStack(definition, destination, source))
+		if (behavior.CanStack(definition, destination, new ItemStackKey(source.QualifiedId, source.Quality, source.Durability)))
 		{
 			int space = GetStackLimit(definition, behavior) - destination.Count;
 			int moved = Math.Min(space, source.Count);
@@ -166,7 +166,7 @@ public sealed class Inventory
 		if (count < 1)
 			throw new ArgumentOutOfRangeException(nameof(count));
 		ItemDefinition definition = _definitions.GetRequired(qualifiedId);
-		var incoming = new ItemInstance(qualifiedId, 1, quality, durability);
+		var incoming = new ItemStackKey(qualifiedId, quality, durability);
 		IItemCategoryBehavior behavior = _behaviors.GetRequired(definition.Category);
 		return GetAvailableCapacity(definition, incoming, behavior) >= count;
 	}
@@ -204,11 +204,10 @@ public sealed class Inventory
 			return false;
 
 		ItemDefinition definition = _definitions.GetRequired(instance.QualifiedId);
-		if (!definition.IsUsable)
+		if (!definition.IsUsable || definition.ResolvedUseEffect == null)
 			return false;
 
-		IItemCategoryBehavior behavior = _behaviors.GetRequired(definition.Category);
-		ItemUseOutcome outcome = behavior.TryUse(definition, instance, context);
+		ItemUseOutcome outcome = definition.ResolvedUseEffect.Execute(definition, instance, context);
 		if (outcome == ItemUseOutcome.Consumed)
 		{
 			instance.Count--;
@@ -311,13 +310,13 @@ public sealed class Inventory
 				spriteBatch.Draw(icon, iconBounds, Color.White);
 			}
 			if (instance.Count > 1)
-				spriteBatch.DrawString(font, instance.Count.ToString(), new Vector2(slotX + 24, slotY + 22), Color.White);
+				spriteBatch.DrawString(font, instance.CountText, new Vector2(slotX + 24, slotY + 22), Color.White);
 		}
 	}
 
 	private long GetAvailableCapacity(
 		ItemDefinition definition,
-		ItemInstance incoming,
+		ItemStackKey incoming,
 		IItemCategoryBehavior behavior)
 	{
 		int stackLimit = GetStackLimit(definition, behavior);

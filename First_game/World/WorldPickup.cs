@@ -1,83 +1,83 @@
+using System;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using Microsoft.Xna.Framework.Input;
 using MonoGameLibrary.Graphics;
-using System;
+using PlayerInventory = First_game.Inventory.Inventory;
+using First_game.Inventory;
 
 namespace First_game.World;
 
-public class WorldPickup
+public sealed class WorldPickup
 {
-    private Sprite pickupItem;
+	private Sprite _sprite;
 
-    public Vector2 Position {get; set; }
+	public WorldPickup()
+	{
+		DrawAction = Draw;
+	}
 
-    public bool IsCollected {get; private set; }
+	public ItemInstance Item { get; private set; }
+	public ItemDefinition Definition { get; private set; }
+	public WorldSpawnNode SourceNode { get; private set; }
+	public WorldSpawnRule SpawnRule { get; private set; }
+	public Point Cell { get; private set; }
+	public Vector2 Position { get; private set; }
+	public float SortY => _sprite.SortY;
+	public bool IsCollected { get; private set; }
+	internal Action<SpriteBatch> DrawAction { get; }
 
-    public bool TryCollect(Vector2 playerPosition, float pickupDistance)
-    {
-        if (IsCollected || !IsWithinReach(playerPosition, pickupDistance))
-        {
-            return false;
-        }
+	internal void Reset(
+		ItemDefinition definition,
+		Texture2D icon,
+		int count,
+		Vector2 position,
+		Point cell,
+		WorldSpawnNode sourceNode,
+		WorldSpawnRule spawnRule)
+	{
+		Definition = definition;
+		Item = new ItemInstance(definition.QualifiedId, count);
+		Position = position;
+		Cell = cell;
+		SourceNode = sourceNode;
+		SpawnRule = spawnRule;
+		IsCollected = false;
 
-        Collect();
-        return true;
-    }
-    
-    public WorldPickup(Texture2D texture, Vector2 initialPosition, float scale = 1f){
-        pickupItem = new Sprite(texture);
-        pickupItem.Scale = scale;
-        Position = initialPosition;
-    }
+		if (_sprite == null)
+			_sprite = new Sprite(icon);
+		else
+			_sprite.Texture = icon;
+		_sprite.Scale = 0.2f;
+		_sprite.Position = position;
+	}
 
-    public void Draw(SpriteBatch spriteBatch)
-    {
-        if(IsCollected == true)
-        {
-            return;
-        }
-        pickupItem.Position = Position;
-        pickupItem.Draw(spriteBatch);
-    }
+	public int TryCollect(PlayerInventory inventory, Vector2 playerPosition, Vector2 worldPoint, float pickupDistance)
+	{
+		if (IsCollected
+			|| Vector2.Distance(playerPosition, Position) > pickupDistance
+			|| !ContainsPoint(worldPoint))
+			return 0;
 
-    public bool IsWithinReach(Vector2 playerPosition, float pickupDistance)
-    {
-        float distance = Vector2.Distance(playerPosition, Position);
-        
-        if (distance <= pickupDistance)
-        {
-            return true;
-        }
-        else
-        {
-            return false;
-        }
+		int added = inventory.AddItem(Item.QualifiedId, Item.Count, Item.Quality, Item.Durability);
+		Item.Count -= added;
+		if (Item.Count == 0)
+			IsCollected = true;
+		return added;
+	}
 
-    }
+	public void Draw(SpriteBatch spriteBatch)
+	{
+		if (!IsCollected)
+			_sprite.Draw(spriteBatch);
+	}
 
-    public void Collect()
-    {
-        IsCollected = true;      
-    }
-
-    public bool ContainsPoint(Vector2 worldPoint)
-    {
-        float spriteWidth = pickupItem.Texture.Width*pickupItem.Scale;
-        float spriteHeight = pickupItem.Texture.Height*pickupItem.Scale;
-
-        float leftBoundary = Position.X - 0.5f*spriteWidth;
-        float rightBoundary = Position.X + 0.5f*spriteWidth;
-        float topBoundary = Position.Y - 0.5f*spriteHeight;
-        float bottomBoundary = Position.Y + 0.5f*spriteHeight;
-
-        if(leftBoundary <= worldPoint.X && worldPoint.X <= rightBoundary && bottomBoundary >= worldPoint.Y && worldPoint.Y >= topBoundary)
-        {
-            return true;
-        }
-        else
-        {
-            return false;
-        }
-    }
+	public bool ContainsPoint(Vector2 worldPoint)
+	{
+		float halfWidth = _sprite.Texture.Width * _sprite.Scale * 0.5f;
+		float halfHeight = _sprite.Texture.Height * _sprite.Scale * 0.5f;
+		return worldPoint.X >= Position.X - halfWidth
+			&& worldPoint.X <= Position.X + halfWidth
+			&& worldPoint.Y >= Position.Y - halfHeight
+			&& worldPoint.Y <= Position.Y + halfHeight;
+	}
 }
