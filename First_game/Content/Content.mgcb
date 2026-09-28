@@ -112,6 +112,19 @@
 /processorParam:Version=3.8.5.1
 /build:Images/House.png
 
+#begin Images/Inventory.png
+/importer:TextureImporter
+/processor:TextureProcessor
+/processorParam:ColorKeyColor=255,0,255,255
+/processorParam:ColorKeyEnabled=False
+/processorParam:GenerateMipmaps=False
+/processorParam:PremultiplyAlpha=True
+/processorParam:ResizeToPowerOfTwo=False
+/processorParam:MakeSquare=False
+/processorParam:TextureFormat=Color
+/processorParam:Version=3.8.5.1
+/build:Images/Inventory.png
+
 #begin Images/Lake.png
 /importer:TextureImporter
 /processor:TextureProcessor

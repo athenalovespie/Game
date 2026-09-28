@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using First_game.World;
 using InventoryRenderer = First_game.Inventory.Inventory;
 using First_game.Inventory;
+using First_game.Input;
 
 namespace First_game;
 
@@ -29,8 +30,8 @@ public class Game1 : Core
     private Sprite House;
     private Sprite Tent;
 
-    private Sprite Lake;
-    private MouseState _previousMouse;
+    private PlacedObject Lake;
+    private MouseInteractionController mouseInteractions;
     private KeyboardState _previousKeyboard;
     private GridPlacer gridPlacer;
     private Texture2D gridPixel;
@@ -148,22 +149,8 @@ public class Game1 : Core
         cat.CollisionOffset = new Vector2(0, 331);
         cat.IsMovementBlocked = bounds => worldGrid.IntersectsBlockedCell(bounds);
 
-        if (!gridPlacer.TryPlaceBuilding(
-            LakeTexture,
-            new Vector2(-2000, 1500),
-            widthInCells: 12,
-            heightInCells: 7,
-            scale: 0.4f,
-            out Lake,
-            groundOffsetY: LakeTexture.Height / 2f - 550f,
-            groundOffsetX: -100f))
-            {
-            throw new InvalidOperationException(
-                "The house footprint is occupied or outside the grid.");
-
-        }
-        string[] lakeShape =
-            {
+        //placing custom footprint for lake
+        Point[] lakeFootprint = GridPlacer.CreateFootprint(
                 "..XXXXXX....",
                 ".XXXXXXXXX..",
                 ".XXXXXXXXXX.",
@@ -171,24 +158,20 @@ public class Game1 : Core
                 "XXXXXXXXXXXX",
                 ".XXXXXXXXXXX",
                 ".XXX....XXX."
-            };
-        // Use the same position passed to TryPlaceBuilding.
-        Point lakeStart = worldGrid.WorldToCell(
-            new Vector2(-2000, 1500));
-
-        for (int row = 0; row < lakeShape.Length; row++)
+        );
+        
+        if (!gridPlacer.TryPlaceFootprint(
+        LakeTexture,
+        new Vector2(-2000, 1500),
+        lakeFootprint,
+        anchorInCells: new Vector2(6f, 7f),
+        scale: 0.4f,
+        out Lake,
+        groundOffsetY: LakeTexture.Height / 2f - 550f,
+        groundOffsetX: -100f))
         {
-            for (int column = 0; column < lakeShape[row].Length; column++)
-            {
-                if (lakeShape[row][column] == '.')
-                {
-                    Point cell = new Point(
-                        lakeStart.X + column,
-                        lakeStart.Y + row);
-
-                    worldGrid.ClearCell(cell);
-                }
-            }
+        throw new InvalidOperationException(
+            "The lake footprint is occupied or outside the grid.");
         }
         
         if (!gridPlacer.TryPlaceBuilding(
@@ -261,9 +244,7 @@ public class Game1 : Core
             }
         }
         camera = new Camera2D(cat.Position);
-
-        // houseObstacle = new Obstacle(House, new Vector2(3750f, 1462f),new Vector2(-77.5f,1000.5f));
-        // House.GroundOffsetY = (houseObstacle.Bounds.Bottom - House.Position.Y) / House.Scale;
+        mouseInteractions = new MouseInteractionController(camera, pickupSystem, inventory);
     
         background = new Sprite(mapTexture);
         background.Scale = 2.0f;
@@ -273,20 +254,9 @@ public class Game1 : Core
     protected override void Update(GameTime gameTime)
     {
         pickupSystem.Update(gameTime);
-        var currentMouse = Mouse.GetState();
         var currentKeyboard = Keyboard.GetState();
         if (currentKeyboard.IsKeyDown(Keys.E) && !_previousKeyboard.IsKeyDown(Keys.E))
             inventoryOpen = !inventoryOpen;
-
-        bool rightClicked;
-        if (currentMouse.RightButton == ButtonState.Pressed && _previousMouse.RightButton == ButtonState.Released)
-        {
-            rightClicked = true;
-        }
-        else
-        {
-            rightClicked = false; 
-        }
 
         if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed)
             Exit();
@@ -302,25 +272,12 @@ public class Game1 : Core
         if (!inventoryOpen)
             cat.Update(gameTime);
 
-        if (rightClicked && !inventoryOpen)
-        {
-            Vector2 mouseWorldPosition = camera.ScreenToWorld(
-                currentMouse.Position.ToVector2(),
-                GraphicsDevice.Viewport.Width,
-                GraphicsDevice.Viewport.Height);
-
-            pickupSystem.TryCollectAt(
-                cat.Position,
-                mouseWorldPosition,
-                inventory,
-                200f,
-                gameTime.TotalGameTime.TotalSeconds);
-        }
+        mouseInteractions.Update(
+            gameTime, GraphicsDevice.Viewport, cat.Position, inventoryOpen);
 
         camera.UpdateTarget(cat.Position);
         camera.Update(gameTime);
 
-        _previousMouse = currentMouse;
         _previousKeyboard = currentKeyboard;
 
         base.Update(gameTime);
@@ -343,7 +300,10 @@ public class Game1 : Core
         SpriteBatch.Begin(transformMatrix: transformMatrix);
 
         background.Draw(SpriteBatch);
-        Lake.Draw(SpriteBatch);
+        if (Lake != null)
+        {
+            Lake.Sprite.Draw(SpriteBatch);
+        }
         worldRenderer.Submit(House.SortY, House.Draw);
         worldRenderer.Submit(Tent.SortY, Tent.Draw);
 

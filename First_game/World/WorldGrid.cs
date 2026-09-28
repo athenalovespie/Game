@@ -270,4 +270,51 @@ public class WorldGrid
 
         return true;
     }
+
+    public bool CanPlaceFootprint(Point startingCell, Point[] footprint)
+    {
+    if (footprint == null || footprint.Length == 0)
+        return false;
+
+    foreach (Point offset in footprint)
+    {
+        Point cell = new Point(
+            startingCell.X + offset.X,
+            startingCell.Y + offset.Y);
+
+        if (!CanPlace(cell))
+            return false;
+    }
+
+    return true;
+    }
+
+public bool OccupyFootprint(
+    Point startingCell,
+    Point[] footprint,
+    CellType type,
+    object occupant,
+    bool blocksMovement)
+    {
+    if (type == CellType.Empty
+        || !CanPlaceFootprint(startingCell, footprint))
+    {
+        return false;
+    }
+
+    // Check the entire shape before reserving any cells.
+    foreach (Point offset in footprint)
+    {
+        Point cell = new Point(
+            startingCell.X + offset.X,
+            startingCell.Y + offset.Y);
+
+        GridCell gridCell = GetCell(cell);
+        gridCell.Type = type;
+        gridCell.Occupant = occupant;
+        gridCell.BlocksMovement = blocksMovement;
+    }
+
+    return true;
+    }
 }
