@@ -8,9 +8,11 @@ using MonoGameLibrary.Graphics;
 using System;
 using System.Collections.Generic;
 using First_game.World;
-using InventoryRenderer = First_game.Inventory.Inventory;
+using PlayerInventory = First_game.Inventory.Inventory;
 using First_game.Inventory;
 using First_game.Input;
+using First_game.UI;
+using MonoGameLibrary.Input;
 
 namespace First_game;
 
@@ -19,7 +21,7 @@ public class Game1 : Core
 {
     private Sprite background;
     private Player cat;
-    private InventoryRenderer inventory;
+    private PlayerInventory inventory;
     private WorldPickupSystem pickupSystem;
     private SpriteFont hudFont;
     private Camera2D camera;
@@ -35,8 +37,9 @@ public class Game1 : Core
     private GridPlacer gridPlacer;
     private Texture2D gridPixel;
     private Func<string, Texture2D> itemTextureLoader;
-    private bool inventoryOpen;
-    private Texture2D inventoryBackground;
+    private UIManager uiManager;
+    private readonly MouseInput mouseInput = new MouseInput();
+    private TimeSpan worldElapsed;
 
     public Game1() : base("Game1" , 1280 , 720, false)
     {
@@ -105,7 +108,7 @@ public class Game1 : Core
         ItemDefinitionRegistry itemDefinitions = SampleItemCatalog.CreateDefinitions();
         ItemCategoryBehaviorRegistry itemBehaviors = SampleItemCatalog.CreateBehaviors();
         itemDefinitions.ResolveUseEffects(UseEffectRegistry.CreateBuiltIns(), itemBehaviors);
-        inventory = new InventoryRenderer(itemDefinitions, itemBehaviors);
+        inventory = new PlayerInventory(itemDefinitions, itemBehaviors);
         var spawnRules = new WorldSpawnRuleRegistry(itemDefinitions);
         WorldSpawnCatalog.RegisterRules(spawnRules);
         pickupSystem = new WorldPickupSystem(
@@ -120,7 +123,12 @@ public class Game1 : Core
         var PineTexture = Content.Load<Texture2D>("Images/Pine");
         var TentTexture = Content.Load<Texture2D>("Images/Tent");
         var LakeTexture = Content.Load<Texture2D>("Images/Lake");
-        inventoryBackground =Content.Load<Texture2D>("Images/Inventory");
+        var inventoryBackground = Content.Load<Texture2D>("Images/Inventory");
+        uiManager = new UIManager(gridPixel);
+        uiManager.Register(MenuType.Inventory, new InventoryPanel(
+            inventory, itemDefinitions, inventoryBackground, hudFont, itemTextureLoader));
+        uiManager.Register(MenuType.Crafting, new CraftingPanel(hudFont));
+        uiManager.Register(MenuType.Pause, new PauseMenu(hudFont));
 
         var walkTextureRight = Content.Load<Texture2D>("Images/Right_walk");
         var walkTextureLeft = Content.Load<Texture2D>("Images/Left_walk");
@@ -245,7 +253,7 @@ public class Game1 : Core
             }
         }
         camera = new Camera2D(cat.Position);
-        mouseInteractions = new MouseInteractionController(camera, pickupSystem, inventory);
+        mouseInteractions = new MouseInteractionController(camera, pickupSystem, inventory, mouseInput);
     
         background = new Sprite(mapTexture);
         background.Scale = 2.0f;
@@ -254,30 +262,35 @@ public class Game1 : Core
 
     protected override void Update(GameTime gameTime)
     {
-        pickupSystem.Update(gameTime);
+        mouseInput.Update();
         var currentKeyboard = Keyboard.GetState();
-        if (currentKeyboard.IsKeyDown(Keys.E) && !_previousKeyboard.IsKeyDown(Keys.E))
-            inventoryOpen = !inventoryOpen;
+        uiManager.Update(gameTime,
+            new UIInput(currentKeyboard, _previousKeyboard, mouseInput),
+            GraphicsDevice.Viewport);
 
-        if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed)
+        if (uiManager.ExitRequested
+            || GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed)
             Exit();
 
-        if (currentKeyboard.IsKeyDown(Keys.Escape) && !_previousKeyboard.IsKeyDown(Keys.Escape))
-        {
-            if (inventoryOpen)
-                inventoryOpen = false;
-            else
-                Exit();
-        }
+        // Respawn timers advance in ordinary menus, but stop during Pause.
+        if (!uiManager.PausesWorld)
+            worldElapsed += gameTime.ElapsedGameTime;
+        var worldTime = new GameTime(worldElapsed,
+            uiManager.PausesWorld ? TimeSpan.Zero : gameTime.ElapsedGameTime);
+        if (!uiManager.PausesWorld)
+            pickupSystem.Update(worldTime);
 
-        if (!inventoryOpen)
+        if (!uiManager.ConsumedInputThisFrame)
             cat.Update(gameTime);
 
         mouseInteractions.Update(
-            gameTime, GraphicsDevice.Viewport, cat.Position, inventoryOpen);
+            worldTime, GraphicsDevice.Viewport, cat.Position, uiManager.ConsumedInputThisFrame);
 
-        camera.UpdateTarget(cat.Position);
-        camera.Update(gameTime);
+        if (!uiManager.PausesWorld)
+        {
+            camera.UpdateTarget(cat.Position);
+            camera.Update(gameTime);
+        }
 
         _previousKeyboard = currentKeyboard;
 
@@ -329,17 +342,15 @@ public class Game1 : Core
         SpriteBatch.End();
         SpriteBatch.Begin();
 
-        if (inventoryOpen)
-        {       
-        inventory.Draw(
-        SpriteBatch,
-        gridPixel,
+        uiManager.Draw(SpriteBatch, GraphicsDevice.Viewport);
+
+        //temporary
+        SpriteBatch.DrawString(
         hudFont,
-        itemTextureLoader,
-        GraphicsDevice.Viewport.Width,
-        GraphicsDevice.Viewport.Height,
-        inventoryBackground);
-        }
+        "0123456789",
+        new Vector2(40, 40),
+        Color.White);
+
         SpriteBatch.End();
 
 

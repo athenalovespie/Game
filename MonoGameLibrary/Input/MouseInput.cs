@@ -11,6 +11,8 @@ public class MouseInput
     private MouseState currentState;
 
     public Point ScreenPosition => currentState.Position;
+    public bool LeftClicked => currentState.LeftButton == ButtonState.Pressed
+        && previousState.LeftButton == ButtonState.Released;
     public bool RightClicked => currentState.RightButton == ButtonState.Pressed
         && previousState.RightButton == ButtonState.Released;
 

@@ -14,29 +14,28 @@ public class MouseInteractionController
     private readonly Camera2D camera;
     private readonly WorldPickupSystem pickupSystem;
     private readonly PlayerInventory inventory;
-    private readonly MouseInput mouse = new MouseInput();
+    private readonly MouseInput mouse;
 
     public MouseInteractionController(
         Camera2D camera,
         WorldPickupSystem pickupSystem,
-        PlayerInventory inventory)
+        PlayerInventory inventory,
+        MouseInput mouse)
     {
         this.camera = camera;
         this.pickupSystem = pickupSystem;
         this.inventory = inventory;
+        this.mouse = mouse;
     }
 
     public void Update(
         GameTime gameTime,
         Viewport viewport,
         Vector2 playerPosition,
-        bool inventoryOpen)
+        bool blocksWorldInput)
     {
-        // Track presses even while the inventory is open, so closing it
-        // while holding the button does not cause a new world interaction.
-        mouse.Update();
-
-        if (!mouse.RightClicked || inventoryOpen)
+        // Game1 updates the shared mouse once, before UI and world input.
+        if (!mouse.RightClicked || blocksWorldInput)
             return;
 
         Vector2 worldPosition = mouse.GetWorldPosition(camera, viewport);
