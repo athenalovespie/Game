@@ -259,60 +259,123 @@ public sealed class Inventory
 		return inventory;
 	}
 
-	public void Draw(
-		SpriteBatch spriteBatch,
-		Texture2D pixel,
-		SpriteFont font,
-		Func<string, Texture2D> loadIcon,
-		int viewportWidth,
-		int viewportHeight)
-	{
-		const int columns = 6;
-		const int slotSize = 40;
-		const int slotGap = 5;
-		int rows = (Capacity + columns - 1) / columns;
-		int panelWidth = columns * slotSize + (columns - 1) * slotGap + 40;
-		int panelHeight = rows * (slotSize + slotGap) + 74;
-		int panelX = (viewportWidth - panelWidth) / 2;
-		int panelY = (viewportHeight - panelHeight) / 2;
+    public void Draw(
+    SpriteBatch spriteBatch,
+    Texture2D pixel,
+    SpriteFont font,
+    Func<string, Texture2D> loadIcon,
+    int viewportWidth,
+    int viewportHeight,
+    Texture2D background)
+    {
+    // This artwork has exactly 12 slots.
+    if (Capacity != 12)
+    {
+        throw new InvalidOperationException(
+            "This inventory layout requires exactly 12 slots.");
+    }
 
-		spriteBatch.Draw(pixel, new Rectangle(0, 0, viewportWidth, viewportHeight), Color.Black * 0.55f);
-		spriteBatch.Draw(pixel, new Rectangle(panelX, panelY, panelWidth, panelHeight), new Color(48, 52, 45));
-		spriteBatch.Draw(pixel, new Rectangle(panelX, panelY, panelWidth, 3), new Color(179, 167, 125));
-		spriteBatch.DrawString(font, "Inventory", new Vector2(panelX + 24, panelY + 18), Color.White);
+    // Fit the panel inside 85% of the screen.
+    // Don't enlarge it beyond its original resolution.
+    float uiScale = Math.Min(
+        1f,
+        Math.Min(
+            viewportWidth * 0.85f / background.Width,
+            viewportHeight * 0.85f / background.Height));
 
-		int gridX = panelX + 20;
-		int gridY = panelY + 54;
-		for (int slotIndex = 0; slotIndex < Capacity; slotIndex++)
-		{
-			int slotX = gridX + slotIndex % columns * (slotSize + slotGap);
-			int slotY = gridY + slotIndex / columns * (slotSize + slotGap);
-			spriteBatch.Draw(pixel, new Rectangle(slotX, slotY, slotSize, slotSize), new Color(20, 23, 20));
-			spriteBatch.Draw(pixel, new Rectangle(slotX + 2, slotY + 2, slotSize - 4, slotSize - 4), new Color(77, 79, 64));
+    Vector2 panelPosition = new Vector2(
+        (viewportWidth - background.Width * uiScale) / 2f,
+        (viewportHeight - background.Height * uiScale) / 2f);
 
-			ItemInstance instance = _slots[slotIndex];
-			if (instance == null)
-				continue;
+    // Darken the world behind the inventory.
+    spriteBatch.Draw(
+        pixel,
+        new Rectangle(0, 0, viewportWidth, viewportHeight),
+        Color.Black * 0.55f);
 
-			ItemDefinition definition = _definitions.GetRequired(instance.QualifiedId);
-			if (definition.IconAsset != null)
-			{
-				Texture2D icon = loadIcon(definition.IconAsset);
-				int iconSize = 26;
-				float scale = Math.Min(iconSize / (float)icon.Width, iconSize / (float)icon.Height);
-				int iconWidth = (int)(icon.Width * scale);
-				int iconHeight = (int)(icon.Height * scale);
-				var iconBounds = new Rectangle(
-					slotX + (slotSize - iconWidth) / 2,
-					slotY + (slotSize - iconHeight) / 2,
-					iconWidth,
-					iconHeight);
-				spriteBatch.Draw(icon, iconBounds, Color.White);
-			}
-			if (instance.Count > 1)
-				spriteBatch.DrawString(font, instance.CountText, new Vector2(slotX + 24, slotY + 22), Color.White);
-		}
-	}
+    // The image already contains the title and slot frames.
+    spriteBatch.Draw(
+        background,
+        panelPosition,
+        null,
+        Color.White,
+        0f,
+        Vector2.Zero,
+        uiScale,
+        SpriteEffects.None,
+        0f);
+
+    const int columns = 4;
+
+    for (int slotIndex = 0; slotIndex < Capacity; slotIndex++)
+    {
+        ItemInstance instance = _slots[slotIndex];
+
+        if (instance == null)
+            continue;
+
+        int column = slotIndex % columns;
+        int row = slotIndex / columns;
+
+        // Coordinates measured in the original artwork.
+        Vector2 localCenter = new Vector2(
+            126f + column * 252f,
+            206f + row * 252f);
+
+        Vector2 screenCenter =
+            panelPosition + localCenter * uiScale;
+
+        ItemDefinition definition =
+            _definitions.GetRequired(instance.QualifiedId);
+
+        if (!string.IsNullOrWhiteSpace(definition.IconAsset))
+        {
+            Texture2D icon = loadIcon(definition.IconAsset);
+
+            // Fit the icon inside a 160x160 area,
+            // preserving its aspect ratio.
+            float iconScale = Math.Min(
+                160f / icon.Width,
+                160f / icon.Height) * uiScale;
+
+            spriteBatch.Draw(
+                icon,
+                screenCenter,
+                null,
+                Color.White,
+                0f,
+                new Vector2(icon.Width / 2f, icon.Height / 2f),
+                iconScale,
+                SpriteEffects.None,
+                0f);
+        }
+
+        if (instance.Count > 1)
+        {
+            string text = instance.CountText;
+
+            // Bottom-right area inside the slot.
+            Vector2 countCorner = panelPosition
+                + (localCenter + new Vector2(94f, 94f))
+                * uiScale;
+
+            Vector2 textSize = font.MeasureString(text);
+            Vector2 textPosition =
+                countCorner - textSize * uiScale;
+
+            spriteBatch.DrawString(
+                font,
+                text,
+                textPosition,
+                new Color(65, 49, 30),
+                0f,
+                Vector2.Zero,
+                uiScale,
+                SpriteEffects.None,
+                0f);
+        }
+    }
+    }
 
 	private long GetAvailableCapacity(
 		ItemDefinition definition,

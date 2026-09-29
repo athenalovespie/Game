@@ -29,7 +29,6 @@ public class Game1 : Core
     private readonly Random random = new Random();
     private Sprite House;
     private Sprite Tent;
-
     private PlacedObject Lake;
     private MouseInteractionController mouseInteractions;
     private KeyboardState _previousKeyboard;
@@ -37,6 +36,7 @@ public class Game1 : Core
     private Texture2D gridPixel;
     private Func<string, Texture2D> itemTextureLoader;
     private bool inventoryOpen;
+    private Texture2D inventoryBackground;
 
     public Game1() : base("Game1" , 1280 , 720, false)
     {
@@ -120,6 +120,7 @@ public class Game1 : Core
         var PineTexture = Content.Load<Texture2D>("Images/Pine");
         var TentTexture = Content.Load<Texture2D>("Images/Tent");
         var LakeTexture = Content.Load<Texture2D>("Images/Lake");
+        inventoryBackground =Content.Load<Texture2D>("Images/Inventory");
 
         var walkTextureRight = Content.Load<Texture2D>("Images/Right_walk");
         var walkTextureLeft = Content.Load<Texture2D>("Images/Left_walk");
@@ -326,16 +327,19 @@ public class Game1 : Core
    
         // Always end the sprite batch when finished.
         SpriteBatch.End();
-
         SpriteBatch.Begin();
+
         if (inventoryOpen)
-            inventory.Draw(
-                SpriteBatch,
-                gridPixel,
-                hudFont,
-                itemTextureLoader,
-                GraphicsDevice.Viewport.Width,
-                GraphicsDevice.Viewport.Height);
+        {       
+        inventory.Draw(
+        SpriteBatch,
+        gridPixel,
+        hudFont,
+        itemTextureLoader,
+        GraphicsDevice.Viewport.Width,
+        GraphicsDevice.Viewport.Height,
+        inventoryBackground);
+        }
         SpriteBatch.End();
 
 
