@@ -13,6 +13,8 @@ using First_game.Inventory;
 using First_game.Input;
 using First_game.UI;
 using MonoGameLibrary.Input;
+using First_game.Actions;
+using First_game.Fishing;
 
 namespace First_game;
 
@@ -40,6 +42,8 @@ public class Game1 : Core
     private UIManager uiManager;
     private readonly MouseInput mouseInput = new MouseInput();
     private TimeSpan worldElapsed;
+    private FishingController fishing;
+    private FishingOverlay fishingOverlay;
 
     public Game1() : base("Game1" , 1280 , 720, false)
     {
@@ -147,7 +151,7 @@ public class Game1 : Core
             { "Front_Idle", new Animation(
                 Content.Load<Texture2D>("Images/Front_Idle"), 2) { FrameDuration = 0.7f }},
             { "Back_Idle", new Animation(
-                Content.Load<Texture2D>("Images/Back_Idle"), 2) { FrameDuration = 0.7f }}
+                Content.Load<Texture2D>("Images/Back_Idle"), 2) { FrameDuration = 0.7f }},
         };
     
         cat = new Player(animations);
@@ -254,6 +258,10 @@ public class Game1 : Core
         }
         camera = new Camera2D(cat.Position);
         mouseInteractions = new MouseInteractionController(camera, pickupSystem, inventory, mouseInput);
+        fishing = new FishingController(cat, inventory);
+        fishing.Register(new FishingSpot(worldGrid, Lake.GetOccupiedCells(), "(O)fish", new FishingSettings()));
+        fishingOverlay = new FishingOverlay(gridPixel);
+        mouseInteractions.TryInteract = fishing.TryInteract;
     
         background = new Sprite(mapTexture);
         background.Scale = 2.0f;
@@ -280,11 +288,18 @@ public class Game1 : Core
         if (!uiManager.PausesWorld)
             pickupSystem.Update(worldTime);
 
-        if (!uiManager.ConsumedInputThisFrame)
-            cat.Update(gameTime);
-
+        // Route interactions before movement so a new action locks movement immediately.
         mouseInteractions.Update(
-            worldTime, GraphicsDevice.Viewport, cat.Position, uiManager.ConsumedInputThisFrame);
+            worldTime, GraphicsDevice.Viewport, cat.GroundPosition,
+            uiManager.ConsumedInputThisFrame || cat.Actions.IsBusy);
+
+        // All menus freeze actions, including their animations and minigame clocks.
+        if (!uiManager.ConsumedInputThisFrame)
+        {
+            cat.Update(gameTime);
+            cat.Actions.Update(gameTime, ActionInput.FromKeyboard(currentKeyboard, _previousKeyboard));
+            fishing.Update(gameTime);
+        }
 
         if (!uiManager.PausesWorld)
         {
@@ -336,6 +351,7 @@ public class Game1 : Core
         // Submit the player last so it draws in front when ground positions tie.
         worldRenderer.Submit(cat.Bounds.Bottom, cat.Draw);
         worldRenderer.Draw(SpriteBatch);
+        fishingOverlay.DrawWorld(SpriteBatch, cat, fishing.Active);
         DrawGrid();
    
         // Always end the sprite batch when finished.
@@ -343,13 +359,6 @@ public class Game1 : Core
         SpriteBatch.Begin();
 
         uiManager.Draw(SpriteBatch, GraphicsDevice.Viewport);
-
-        //temporary
-        SpriteBatch.DrawString(
-        hudFont,
-        "0123456789",
-        new Vector2(40, 40),
-        Color.White);
 
         SpriteBatch.End();
 

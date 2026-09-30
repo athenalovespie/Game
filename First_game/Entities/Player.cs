@@ -7,8 +7,11 @@ using MonoGameLibrary.Input;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using First_game.Actions;
+
 
 namespace First_game.Entities;
+
 
 public class Player
 {
@@ -21,6 +24,21 @@ public class Player
     private Vector2 _velocity;
 
     public InputBindings Input { get; } = new InputBindings();
+
+    public PlayerActionController Actions { get; }
+    public PlayerActionState ActionState => Actions.IsBusy ? PlayerActionState.Acting : PlayerActionState.Free;
+    public Vector2 GroundPosition => new Vector2(Bounds.Center.X, Bounds.Bottom);
+    public string Facing { get; private set; } = "Right";
+
+    public bool IsActionAnimationComplete
+    {
+        get
+        {
+            return ActionState == PlayerActionState.Acting
+            && _animationManager != null
+            && !_animationManager.IsPlaying;
+        }
+    }
 
     public float Speed;
     public float Scale;
@@ -57,6 +75,7 @@ public class Player
     }
     public Player(Texture2D texture, Vector2 position)
     {
+       Actions = new PlayerActionController(this);
        _sprite = new Sprite(texture);
         _position = position;
     }
@@ -117,21 +136,25 @@ public class Player
         if(_velocity.X > 0)
             {
             _idleAnimation = "Right_Idle";
+            Facing = "Right";
             _animationManager.Play(_animations["WalkRight"]); 
             }   
         else if(_velocity.X < 0)
             {
             _idleAnimation = "Left_Idle";
+            Facing = "Left";
             _animationManager.Play(_animations["WalkLeft"]);
             }
         else if(_velocity.Y > 0)
             {
             _idleAnimation = "Front_Idle";
+            Facing = "Front";
             _animationManager.Play(_animations["WalkDown"]);
             }
         else if(_velocity.Y < 0)
             {
             _idleAnimation = "Back_Idle";
+            Facing = "Back";
             _animationManager.Play(_animations["WalkUp"]);
             }
         else
@@ -142,17 +165,53 @@ public class Player
 
     public Player(Dictionary<string, Animation> animations)
     {
+        Actions = new PlayerActionController(this);
         _animations = animations;
         _animationManager = new AnimationManager(_animations.First().Value);
         _sprite = new Sprite(_animationManager.Texture);
     }
+
+    public void FaceTowards(Vector2 target)
+    {
+        Vector2 direction = target - GroundPosition;
+        Facing = MathF.Abs(direction.X) >= MathF.Abs(direction.Y)
+            ? (direction.X >= 0 ? "Right" : "Left")
+            : (direction.Y >= 0 ? "Front" : "Back");
+        _idleAnimation = Facing + "_Idle";
+    }
+
+    /// <summary>Missing action artwork falls back to the current facing's idle pose.</summary>
+    public bool PlayActionAnimation(string animationName)
+    {
+        _velocity = Vector2.Zero;
+        if (_animationManager == null) return false;
+        if (animationName == null || !_animations.TryGetValue(animationName, out Animation animation))
+        {
+            RestoreIdleAnimation();
+            return false;
+        }
+        _animationManager.Play(animation, restart: true);
+        return true;
+    }
+
+    public void RestoreIdleAnimation()
+    {
+        _velocity = Vector2.Zero;
+        if (_animationManager != null && _animations.TryGetValue(_idleAnimation, out Animation idle))
+            _animationManager.Play(idle);
+    }
+
     public void Update(GameTime gameTime)
     {
-        Move(gameTime);
 
+        if (!Actions.BlocksMovement){
+            Move(gameTime);
+        }
         if (_animationManager != null)
         {
+            if(ActionState == PlayerActionState.Free){
             SetAnimations();
+            }
             _animationManager.Update(gameTime);
         }
               

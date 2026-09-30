@@ -24,9 +24,9 @@ public Texture2D Texture => _animation.Texture;
                                                     CurrentFrame * _animation.FrameWidth, 0,
                                                     _animation.FrameWidth, _animation.FrameHeight);
 
-    public void Play(Animation animation)
+    public void Play(Animation animation, bool restart = false)
     {
-        if (_animation == animation && IsPlaying)
+        if (_animation == animation && IsPlaying && !restart)
             return;
         
         _animation = animation;

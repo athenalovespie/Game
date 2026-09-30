@@ -21,7 +21,6 @@ public static class WorldSpawnCatalog
 	{
 		return new[]
 		{
-			new SpawnNodeConfig("fish_spot", 5, new Vector2(-1000, -1000), new Vector2(1200, 1200)),
 			new SpawnNodeConfig("wood_pile", 5, new Vector2(-1000, -1000), new Vector2(1200, 1200)),
 			new SpawnNodeConfig("blackberry_bush", 5, new Vector2(-600, 400), new Vector2(1200, 1600))
 		};

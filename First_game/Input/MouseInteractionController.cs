@@ -15,6 +15,7 @@ public class MouseInteractionController
     private readonly WorldPickupSystem pickupSystem;
     private readonly PlayerInventory inventory;
     private readonly MouseInput mouse;
+    public System.Func<Vector2, bool> TryInteract { get; set; }
 
     public MouseInteractionController(
         Camera2D camera,
@@ -39,6 +40,7 @@ public class MouseInteractionController
             return;
 
         Vector2 worldPosition = mouse.GetWorldPosition(camera, viewport);
+        if (TryInteract?.Invoke(worldPosition) == true) return;
 
         pickupSystem.TryCollectAt(
             playerPosition,
