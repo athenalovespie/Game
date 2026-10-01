@@ -1,31 +1,60 @@
-# Menus
-
-- `UIManager` opens one menu at a time, handles shortcuts, and draws the shared dim overlay.
-- `InventoryPanel` draws the existing 12-slot artwork and reads items through `Inventory.GetSlot()`.
-- `CraftingPanel` is a placeholder for recipe selection and crafting controls.
-- `PauseMenu` is a placeholder for pause/settings controls. Pause stops player movement, camera updates, and pickup respawn time.
-- `IMenuPanel` defines the update and draw methods for each menu.
-- `UIInput` provides the current keyboard, previous keyboard, and shared mouse input.
+# Inventory, hotbar, and menus
 
 ## Controls
 
-E toggles Inventory. C toggles Crafting. P toggles Pause. Escape closes an open menu; from the world, it exits the game as before. E and C do not switch menus while paused.
+- **1, 2, 3, 4, 5, 6, 7, 8, 9, 0:** select hotbar slots 1 through 10. Numpad keys also work.
+- **Left-click the hotbar:** select that slot.
+- **E:** open or close the inventory. Its top row contains the same ten slots as the hotbar.
+- **Inside the inventory:** click an item, then a destination to move it. Compatible stacks merge; different items swap.
+- **Right-click or click outside the inventory slots:** cancel a pending move. Clicking the source again also cancels it.
+- **C:** crafting. **P:** pause. **Escape:** close an open menu; from the world, exit the game.
+
+The player has 30 slots: ten in the hotbar and twenty below it. Collected items first fill compatible stacks, then empty slots from left to right, starting in the hotbar. Empty hotbar slots can be selected. Number keys select items without consuming them.
+
+The supplied `Hudbar.png`, `Highlight.png`, and `Inventory.png` are used directly. The UI scales with the viewport. Stack counts, slot key labels, and the selected item's name are drawn over/near the artwork.
+
+## Where the code lives
+
+| File | Responsibility |
+| --- | --- |
+| `Inventory/Inventory.cs` | Owns item stacks, moves, stacking, item use, and serialization. `PlayerCapacity` is 30; legacy 12/24/36-slot saves and chest sizes remain supported. |
+| `Inventory/Hotbar.cs` | Tracks the selected slot and reads its current item from the inventory. No duplicate item collection. |
+| `Input/HotbarInput.cs` | Maps fresh number-key presses to slot indexes; 0 maps to index 9. |
+| `UI/InventoryLayout.cs` | Measures the PNG slot positions, scales them, and uses those same rectangles for mouse hits. |
+| `UI/ItemSlotRenderer.cs` | Draws icons, counts, key labels, selection frames, and captions for both panels. |
+| `UI/HotbarPanel.cs` | Draws the bottom bar and handles its keyboard/mouse selection. |
+| `UI/InventoryPanel.cs` | Draws inventory rows and handles click-to-move interactions. |
+| `UI/UIManager.cs` | Opens one menu at a time, routes menu input, and draws the dim overlay. |
+| `Game1.cs` | Creates the shared inventory/hotbar and connects update/draw calls. |
+
+Slots are zero-based in code. Inventory indexes 0-9 are always the hotbar. `hotbar.SelectedItem` returns the live selected stack (or null), including after a move, pickup, or consumption. Gameplay actions can call `hotbar.TryUseSelectedItem(context)` with an `IItemUseContext` implementation. Health, stamina, and tool effects still require their gameplay systems; selecting an item does not invent an effect or consume it.
+
+The 30-slot player inventory fits on one page. When displaying an older 36-slot inventory, Page Up/Page Down switch the lower storage rows while keeping the hotbar row fixed. Pending moves are canceled when closing/switching menus or changing pages, so no item is left on a cursor or lost.
+
+## Input and drawing order
+
+Game1 samples the mouse once, updates menus, then updates the hotbar if no menu consumed input. Inventory and Crafting block movement and collection while allowing respawn timers to continue. Pause also stops world timers and camera updates. E/C do not switch menus while paused.
+
+Hovering over the hotbar blocks mouse interactions with the world behind it while allowing movement. Closing a menu consumes that frame's input to prevent clicks from reaching world objects.
+
+Game1 owns SpriteBatch Begin/End. The hotbar draws after the world, followed by the menu dim overlay and active panel. UI panels use screen coordinates without the world camera transform.
 
 ## Add a menu
 
 1. Add a value to `MenuType`.
-2. Create a class implementing `IMenuPanel`. Pass its textures and gameplay services through its constructor.
+2. Create a class implementing `IMenuPanel`, passing dependencies through its constructor.
 3. Register it in `Game1.LoadContent()` using `uiManager.Register(...)`.
 4. Open it with `uiManager.Open(...)`, or add a shortcut in `UIManager.Update()`.
+5. Implement `OnClosed()` if the panel has temporary interaction state to clear.
 
-Panels draw inside Game1's UI SpriteBatch. Do not call Begin/End inside a panel or use the world camera transform.
+Crafting recipes and pause/settings buttons remain placeholders. Keep gameplay rules in their systems; panels should call those systems when the player chooses an action.
 
-Keep gameplay rules in their own systems. For example, a Craft button should ask a crafting system to check ingredients and inventory space before making changes.
+## Checks
 
-## Input and future controls
+`Tests/GameplayChecks/InventoryChecks.cs` covers all ten key bindings, shared slot data, movement/stacking/swapping, selection after consumption, menu cancellation, save compatibility, paging, and layout hit testing at several screen sizes.
 
-Game1 samples mouse input once per frame, then updates the UI before world interactions. Panels can use `input.Mouse.ScreenPosition`, `LeftClicked`, and `RightClicked`. Use the same screen rectangles to draw controls and check mouse hits.
-
-`ConsumedInputThisFrame` also blocks world actions on the frame a menu closes, preventing clicks from reaching objects behind it. Inventory and Crafting block movement and collection but allow respawn timers to continue.
-
-Slot dragging, crafting recipes, buttons, and layered confirmation popups are not implemented yet. The inventory artwork still supports exactly 12 slots; add paging or another layout before displaying an upgraded inventory.
+```powershell
+dotnet build First_game.sln --no-restore -m:1
+dotnet build Tests/GameplayChecks/GameplayChecks.csproj --no-restore -m:1
+dotnet run --project Tests/GameplayChecks/GameplayChecks.csproj --no-build
+```

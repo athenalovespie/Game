@@ -33,10 +33,17 @@ public sealed class UIManager
     {
         if (!panels.ContainsKey(menu))
             throw new ArgumentException("Register the menu before opening it.", nameof(menu));
+        if (ActiveMenu != menu)
+            Close();
         ActiveMenu = menu;
     }
 
-    public void Close() => ActiveMenu = MenuType.None;
+    public void Close()
+    {
+        if (panels.TryGetValue(ActiveMenu, out IMenuPanel panel))
+            panel.OnClosed();
+        ActiveMenu = MenuType.None;
+    }
 
     public void Toggle(MenuType menu)
     {

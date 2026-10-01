@@ -1,144 +1,115 @@
 using System;
+using First_game.Input;
+using First_game.Inventory;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using First_game.Inventory;
+using Microsoft.Xna.Framework.Input;
 using PlayerInventory = First_game.Inventory.Inventory;
 
 namespace First_game.UI;
 
+/// <summary>Shows every inventory item; its first row is the live hotbar.</summary>
 public sealed class InventoryPanel : IMenuPanel
 {
     private readonly PlayerInventory inventory;
-    private readonly ItemDefinitionRegistry definitions;
+    private readonly Hotbar hotbar;
     private readonly Texture2D background;
-    private readonly SpriteFont font;
-    private readonly Func<string, Texture2D> loadIcon;
+    private readonly ItemSlotRenderer slots;
+    private int moveSource = -1;
+    private int hoveredSlot = -1;
+    private int page;
 
-    public InventoryPanel(PlayerInventory inventory, ItemDefinitionRegistry definitions,
-        Texture2D background, SpriteFont font, Func<string, Texture2D> loadIcon)
+    private int PageCount => Math.Max(1, (int)Math.Ceiling(
+        (inventory.Capacity - Hotbar.SlotCount) / (float)InventoryLayout.StorageSlotsPerPage));
+
+    public InventoryPanel(PlayerInventory inventory, Hotbar hotbar,
+        Texture2D background, ItemSlotRenderer slots)
     {
         this.inventory = inventory;
-        this.definitions = definitions;
+        this.hotbar = hotbar;
         this.background = background;
-        this.font = font;
-        this.loadIcon = loadIcon;
+        this.slots = slots;
     }
 
     public void Update(GameTime gameTime, UIInput input, Viewport viewport)
     {
-        // Add slot selection or dragging here. Inventory owns the item data.
+        int pressedSlot = HotbarInput.GetPressedSlot(input);
+        if (pressedSlot >= 0)
+            hotbar.SelectSlot(pressedSlot);
+
+        // The new player inventory fits on one page. Legacy upgraded inventories
+        // can use additional storage pages without changing their hotbar row.
+        int previousPage = page;
+        if (input.Pressed(Keys.PageDown)) page = Math.Min(PageCount - 1, page + 1);
+        if (input.Pressed(Keys.PageUp)) page = Math.Max(0, page - 1);
+        if (page != previousPage) moveSource = -1;
+
+        int visibleSlot = InventoryLayout.ForInventory(viewport).HitTest(input.Mouse.ScreenPosition);
+        hoveredSlot = visibleSlot < 0 ? -1 : InventoryLayout.GetInventorySlot(visibleSlot, page);
+        if (hoveredSlot >= inventory.Capacity) hoveredSlot = -1;
+
+        if (input.Mouse.RightClicked)
+        {
+            moveSource = -1;
+            return;
+        }
+
+        if (input.Mouse.LeftClicked)
+            ClickSlot(hoveredSlot);
     }
 
-    public void Draw(SpriteBatch spriteBatch, Viewport viewport)
+    // Click an item, then its destination. Inventory handles moves, merges, and swaps
+    // atomically; no stack is removed while the player is choosing a destination.
+    public void ClickSlot(int slot)
     {
-        int viewportWidth = viewport.Width;
-        int viewportHeight = viewport.Height;
-        // This artwork has exactly 12 slots.
-        if (inventory.Capacity != 12)
+        if (slot < 0 || slot >= inventory.Capacity)
         {
-            throw new InvalidOperationException(
-                "This inventory layout requires exactly 12 slots.");
+            moveSource = -1;
+            return;
         }
 
-        // Fit the panel inside 85% of the screen.
-        // Don't enlarge it beyond its original resolution.
-        float uiScale = Math.Min(
-            1f,
-            Math.Min(
-                viewportWidth * 0.85f / background.Width,
-                viewportHeight * 0.85f / background.Height));
+        if (slot < Hotbar.SlotCount)
+            hotbar.SelectSlot(slot);
 
-        Vector2 panelPosition = new Vector2(
-            (viewportWidth - background.Width * uiScale) / 2f,
-            (viewportHeight - background.Height * uiScale) / 2f);
-
-        // The image already contains the title and slot frames.
-        spriteBatch.Draw(
-            background,
-            panelPosition,
-            null,
-            Color.White,
-            0f,
-            Vector2.Zero,
-            uiScale,
-            SpriteEffects.None,
-            0f);
-
-        const int columns = 4;
-
-        for (int slotIndex = 0; slotIndex < inventory.Capacity; slotIndex++)
+        if (moveSource >= 0)
         {
-            ItemInstance instance = inventory.GetSlot(slotIndex);
-
-            if (instance == null)
-                continue;
-
-            int column = slotIndex % columns;
-            int row = slotIndex / columns;
-
-            // Coordinates measured in the original artwork.
-            Vector2 localCenter = new Vector2(
-                126f + column * 252f,
-                206f + row * 252f);
-
-            Vector2 screenCenter =
-                panelPosition + localCenter * uiScale;
-
-            ItemDefinition definition =
-                definitions.GetRequired(instance.QualifiedId);
-
-            if (!string.IsNullOrWhiteSpace(definition.IconAsset))
-            {
-                Texture2D icon = loadIcon(definition.IconAsset);
-
-                // Fit the icon inside a 160x160 area,
-                // preserving its aspect ratio.
-                float iconScale = Math.Min(
-                    160f / icon.Width,
-                    160f / icon.Height) * uiScale;
-
-                spriteBatch.Draw(
-                    icon,
-                    screenCenter,
-                    null,
-                    Color.White,
-                    0f,
-                    new Vector2(icon.Width / 2f, icon.Height / 2f),
-                    iconScale,
-                    SpriteEffects.None,
-                    0f);
-            }
-
-            if (instance.Count > 1)
-            {
-                string text = instance.CountText;
-
-                // Bottom-right area inside the slot.
-                Vector2 countCorner = panelPosition
-                    + (localCenter + new Vector2(94f, 94f))
-                    * uiScale;
-
-                Vector2 textSize = font.MeasureString(text);
-                Vector2 textPosition =
-                    countCorner - textSize;
-                textPosition = new Vector2(
-                MathF.Round(textPosition.X),
-                MathF.Round(textPosition.Y));
-
-                spriteBatch.DrawString(
-                    font,
-                    text,
-                    textPosition,
-                    new Color(65, 49, 30),
-                    0f,
-                    Vector2.Zero,
-                    uiScale,
-                    SpriteEffects.None,
-                    0f);
-            }
+            inventory.MoveItem(moveSource, slot);
+            moveSource = -1;
         }
+        else if (inventory.GetSlot(slot) != null)
+            moveSource = slot;
     }
 
+    public void OnClosed()
+    {
+        moveSource = -1;
+        hoveredSlot = -1;
+    }
 
+    public void Draw(SpriteBatch batch, Viewport viewport)
+    {
+        InventoryLayout layout = InventoryLayout.ForInventory(viewport);
+        batch.Draw(background, layout.Bounds, Color.White);
+
+        for (int visibleSlot = 0; visibleSlot < InventoryLayout.VisibleSlots; visibleSlot++)
+        {
+            int inventorySlot = InventoryLayout.GetInventorySlot(visibleSlot, page);
+            if (inventorySlot >= inventory.Capacity) continue;
+            slots.Draw(batch, layout.GetSlotBounds(visibleSlot), inventory.GetSlot(inventorySlot),
+                visibleSlot < Hotbar.SlotCount ? visibleSlot : -1,
+                selected: inventorySlot == hotbar.SelectedSlot, moving: inventorySlot == moveSource);
+        }
+
+        string hint = moveSource >= 0
+            ? "Click a destination to move, stack or swap. Right-click to cancel."
+            : "Top row: hotbar (1-9, 0). Click an item, then a destination. E: close.";
+        slots.DrawCaption(batch, hint, new Vector2(layout.Bounds.Center.X, layout.Bounds.Bottom + 24),
+            layout.Bounds.Width);
+        if (PageCount > 1)
+            slots.DrawCaption(batch, $"Storage page {page + 1}/{PageCount} - Page Up / Page Down",
+                new Vector2(layout.Bounds.Center.X, layout.Bounds.Bottom + 55), layout.Bounds.Width);
+        if (hoveredSlot >= 0 && inventory.GetSlot(hoveredSlot) != null)
+            slots.DrawCaption(batch, slots.GetItemName(inventory.GetSlot(hoveredSlot)),
+                new Vector2(layout.Bounds.Center.X, layout.Bounds.Top - 24), layout.Bounds.Width);
+    }
 }
-

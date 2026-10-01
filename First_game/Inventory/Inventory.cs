@@ -6,6 +6,8 @@ namespace First_game.Inventory;
 public sealed class Inventory
 {
 	public const int DefaultCapacity = 12;
+	// The player's artwork has three rows of ten. Keep legacy sizes valid for saves/chests.
+	public const int PlayerCapacity = 30;
 	public const int MaximumCapacity = 36;
 	public const int UpgradeIncrement = 12;
 	private const int SaveVersion = 1;
@@ -284,8 +286,9 @@ public sealed class Inventory
 
 	private static void ValidateCapacity(int capacity)
 	{
-		if (capacity < DefaultCapacity || capacity > MaximumCapacity || capacity % UpgradeIncrement != 0)
-			throw new ArgumentOutOfRangeException(nameof(capacity), "Capacity must be 12, 24, or 36 slots.");
+		if (capacity != PlayerCapacity
+			&& (capacity < DefaultCapacity || capacity > MaximumCapacity || capacity % UpgradeIncrement != 0))
+			throw new ArgumentOutOfRangeException(nameof(capacity), "Capacity must be 12, 24, 30, or 36 slots.");
 	}
 
 	private void ValidateSlotIndex(int slotIndex)

@@ -40,6 +40,8 @@ public class Game1 : Core
     private Texture2D gridPixel;
     private Func<string, Texture2D> itemTextureLoader;
     private UIManager uiManager;
+    private Hotbar hotbar;
+    private HotbarPanel hotbarPanel;
     private readonly MouseInput mouseInput = new MouseInput();
     private TimeSpan worldElapsed;
     private FishingController fishing;
@@ -112,7 +114,8 @@ public class Game1 : Core
         ItemDefinitionRegistry itemDefinitions = SampleItemCatalog.CreateDefinitions();
         ItemCategoryBehaviorRegistry itemBehaviors = SampleItemCatalog.CreateBehaviors();
         itemDefinitions.ResolveUseEffects(UseEffectRegistry.CreateBuiltIns(), itemBehaviors);
-        inventory = new PlayerInventory(itemDefinitions, itemBehaviors);
+        inventory = new PlayerInventory(itemDefinitions, itemBehaviors, PlayerInventory.PlayerCapacity);
+        hotbar = new Hotbar(inventory);
         var spawnRules = new WorldSpawnRuleRegistry(itemDefinitions);
         WorldSpawnCatalog.RegisterRules(spawnRules);
         pickupSystem = new WorldPickupSystem(
@@ -128,9 +131,13 @@ public class Game1 : Core
         var TentTexture = Content.Load<Texture2D>("Images/Tent");
         var LakeTexture = Content.Load<Texture2D>("Images/Lake");
         var inventoryBackground = Content.Load<Texture2D>("Images/Inventory");
+        var hotbarBackground = Content.Load<Texture2D>("Images/Hudbar");
+        var selectionHighlight = Content.Load<Texture2D>("Images/Highlight");
+        var itemSlots = new ItemSlotRenderer(itemDefinitions, itemTextureLoader, hudFont, selectionHighlight);
+        hotbarPanel = new HotbarPanel(inventory, hotbar, hotbarBackground, itemSlots);
         uiManager = new UIManager(gridPixel);
         uiManager.Register(MenuType.Inventory, new InventoryPanel(
-            inventory, itemDefinitions, inventoryBackground, hudFont, itemTextureLoader));
+            inventory, hotbar, inventoryBackground, itemSlots));
         uiManager.Register(MenuType.Crafting, new CraftingPanel(hudFont));
         uiManager.Register(MenuType.Pause, new PauseMenu(hudFont));
 
@@ -272,9 +279,16 @@ public class Game1 : Core
     {
         mouseInput.Update();
         var currentKeyboard = Keyboard.GetState();
+        var uiInput = new UIInput(currentKeyboard, _previousKeyboard, mouseInput);
         uiManager.Update(gameTime,
-            new UIInput(currentKeyboard, _previousKeyboard, mouseInput),
+            uiInput,
             GraphicsDevice.Viewport);
+
+        // Menus own their input; hovering the HUD only blocks mouse interactions,
+        // so walking still works while the cursor rests on the hotbar.
+        bool mouseOverHotbar = false;
+        if (!uiManager.ConsumedInputThisFrame)
+            mouseOverHotbar = hotbarPanel.Update(uiInput, GraphicsDevice.Viewport);
 
         if (uiManager.ExitRequested
             || GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed)
@@ -291,7 +305,7 @@ public class Game1 : Core
         // Route interactions before movement so a new action locks movement immediately.
         mouseInteractions.Update(
             worldTime, GraphicsDevice.Viewport, cat.GroundPosition,
-            uiManager.ConsumedInputThisFrame || cat.Actions.IsBusy);
+            uiManager.ConsumedInputThisFrame || mouseOverHotbar || cat.Actions.IsBusy);
 
         // All menus freeze actions, including their animations and minigame clocks.
         if (!uiManager.ConsumedInputThisFrame)
@@ -358,6 +372,7 @@ public class Game1 : Core
         SpriteBatch.End();
         SpriteBatch.Begin();
 
+        hotbarPanel.Draw(SpriteBatch, GraphicsDevice.Viewport);
         uiManager.Draw(SpriteBatch, GraphicsDevice.Viewport);
 
         SpriteBatch.End();
