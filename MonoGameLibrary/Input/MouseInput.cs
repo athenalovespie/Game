@@ -13,14 +13,19 @@ public class MouseInput
     public Point ScreenPosition => currentState.Position;
     public bool LeftClicked => currentState.LeftButton == ButtonState.Pressed
         && previousState.LeftButton == ButtonState.Released;
+    public bool LeftReleased => currentState.LeftButton == ButtonState.Released
+        && previousState.LeftButton == ButtonState.Pressed;
     public bool RightClicked => currentState.RightButton == ButtonState.Pressed
         && previousState.RightButton == ButtonState.Released;
 
     // Call once each frame, including while menus are open.
-    public void Update()
+    public void Update() => Update(Mouse.GetState());
+
+    // Explicit samples also allow deterministic gesture checks without a window.
+    public void Update(MouseState state)
     {
         previousState = currentState;
-        currentState = Mouse.GetState();
+        currentState = state;
     }
 
     public Vector2 GetWorldPosition(Camera2D camera, Viewport viewport)

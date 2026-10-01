@@ -13,13 +13,16 @@ public sealed class HotbarPanel
     private readonly Hotbar hotbar;
     private readonly Texture2D background;
     private readonly ItemSlotRenderer slots;
+    private readonly InventoryDragController drag;
 
-    public HotbarPanel(PlayerInventory inventory, Hotbar hotbar, Texture2D background, ItemSlotRenderer slots)
+    public HotbarPanel(PlayerInventory inventory, Hotbar hotbar, Texture2D background, ItemSlotRenderer slots,
+        InventoryDragController drag = null)
     {
         this.inventory = inventory;
         this.hotbar = hotbar;
         this.background = background;
         this.slots = slots;
+        this.drag = drag;
     }
 
     // Returns true over the HUD so right-clicks cannot collect objects behind it.
@@ -41,7 +44,8 @@ public sealed class HotbarPanel
         InventoryLayout layout = InventoryLayout.ForHotbar(viewport);
         batch.Draw(background, layout.Bounds, Color.White);
         for (int slot = 0; slot < Hotbar.SlotCount; slot++)
-            slots.Draw(batch, layout.GetSlotBounds(slot), inventory.GetSlot(slot), slot,
+            slots.Draw(batch, layout.GetSlotBounds(slot),
+                drag == null ? inventory.GetSlot(slot) : drag.GetDisplayedItem(inventory, slot), slot,
                 selected: slot == hotbar.SelectedSlot);
 
         if (hotbar.SelectedItem != null)

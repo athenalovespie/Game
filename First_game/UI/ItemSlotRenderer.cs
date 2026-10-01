@@ -8,6 +8,7 @@ namespace First_game.UI;
 /// <summary>Draws item icons, counts, key labels, and the supplied selection artwork.</summary>
 public sealed class ItemSlotRenderer
 {
+    private static readonly string[] KeyLabels = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0" };
     private static readonly Color Ink = new(65, 49, 30);
     private readonly ItemDefinitionRegistry definitions;
     private readonly Func<string, Texture2D> loadIcon;
@@ -57,7 +58,7 @@ public sealed class ItemSlotRenderer
         }
 
         if (keySlot >= 0)
-            batch.DrawString(font, ((keySlot + 1) % 10).ToString(),
+            batch.DrawString(font, KeyLabels[keySlot],
                 new Vector2(bounds.X + padding, bounds.Y + padding), Ink,
                 0, Vector2.Zero, textScale, SpriteEffects.None, 0);
 

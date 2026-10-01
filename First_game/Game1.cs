@@ -134,10 +134,11 @@ public class Game1 : Core
         var hotbarBackground = Content.Load<Texture2D>("Images/Hudbar");
         var selectionHighlight = Content.Load<Texture2D>("Images/Highlight");
         var itemSlots = new ItemSlotRenderer(itemDefinitions, itemTextureLoader, hudFont, selectionHighlight);
-        hotbarPanel = new HotbarPanel(inventory, hotbar, hotbarBackground, itemSlots);
+        var inventoryDrag = new InventoryDragController();
+        hotbarPanel = new HotbarPanel(inventory, hotbar, hotbarBackground, itemSlots, inventoryDrag);
         uiManager = new UIManager(gridPixel);
         uiManager.Register(MenuType.Inventory, new InventoryPanel(
-            inventory, hotbar, inventoryBackground, itemSlots));
+            inventory, hotbar, inventoryBackground, itemSlots, inventoryDrag));
         uiManager.Register(MenuType.Crafting, new CraftingPanel(hudFont));
         uiManager.Register(MenuType.Pause, new PauseMenu(hudFont));
 
@@ -273,6 +274,14 @@ public class Game1 : Core
         background = new Sprite(mapTexture);
         background.Scale = 2.0f;
         background.Position = new Vector2(620, 360);
+    }
+
+    protected override void OnDeactivated(object sender, EventArgs args)
+    {
+        // A release outside the game window must not leave a pending drag.
+        if (uiManager?.ActiveMenu == MenuType.Inventory)
+            uiManager.Close();
+        base.OnDeactivated(sender, args);
     }
 
     protected override void Update(GameTime gameTime)

@@ -89,62 +89,94 @@ public sealed class Inventory
 		return count - remaining;
 	}
 
-	public bool MoveItem(int sourceIndex, int destinationIndex)
+	public bool MoveItem(int sourceIndex, int destinationIndex) =>
+		MoveItem(sourceIndex, this, destinationIndex);
+
+	// Inventories (including chest contents) share the game's definition and behavior registries.
+	public bool MoveItem(int sourceIndex, Inventory destinationInventory, int destinationIndex)
 	{
 		ValidateSlotIndex(sourceIndex);
-		ValidateSlotIndex(destinationIndex);
-		if (sourceIndex == destinationIndex || _slots[sourceIndex] == null)
+		ValidateTransferDestination(destinationInventory, destinationIndex);
+		if ((ReferenceEquals(this, destinationInventory) && sourceIndex == destinationIndex)
+			|| _slots[sourceIndex] == null)
 			return false;
 
 		ItemInstance source = _slots[sourceIndex];
-		ItemInstance destination = _slots[destinationIndex];
+		ItemInstance destination = destinationInventory._slots[destinationIndex];
 		if (destination == null)
 		{
-			_slots[destinationIndex] = source;
+			destinationInventory._slots[destinationIndex] = source;
 			_slots[sourceIndex] = null;
 			return true;
 		}
 
-		ItemDefinition definition = _definitions.GetRequired(source.QualifiedId);
-		IItemCategoryBehavior behavior = _behaviors.GetRequired(definition.Category);
-		if (behavior.CanStack(definition, destination, new ItemStackKey(source.QualifiedId, source.Quality, source.Durability)))
+		int moved = GetMergeCount(source, destination, source.Count);
+		if (moved > 0)
 		{
-			int space = GetStackLimit(definition, behavior) - destination.Count;
-			int moved = Math.Min(space, source.Count);
-			if (moved > 0)
-			{
-				destination.Count += moved;
-				source.Count -= moved;
-				if (source.Count == 0)
-					_slots[sourceIndex] = null;
-				return true;
-			}
+			destination.Count += moved;
+			source.Count -= moved;
+			if (source.Count == 0)
+				_slots[sourceIndex] = null;
+			return true;
 		}
 
+		// Preserve the existing full-stack swap rule, including a compatible full destination.
 		_slots[sourceIndex] = destination;
-		_slots[destinationIndex] = source;
+		destinationInventory._slots[destinationIndex] = source;
 		return true;
 	}
 
-	public bool SplitStack(int sourceIndex, int destinationIndex, int count)
+	public bool SplitStack(int sourceIndex, int destinationIndex, int count) =>
+		SplitStack(sourceIndex, this, destinationIndex, count);
+
+	// Commit a split atomically. Compatible stacks accept what fits; leftovers stay
+	// at the source. Incompatible or full destinations reject the split without changes.
+	public bool SplitStack(int sourceIndex, Inventory destinationInventory, int destinationIndex, int count)
 	{
 		ValidateSlotIndex(sourceIndex);
-		ValidateSlotIndex(destinationIndex);
-		if (sourceIndex == destinationIndex
-			|| count < 1
-			|| _slots[sourceIndex] == null
-			|| _slots[destinationIndex] != null
-			|| count >= _slots[sourceIndex].Count)
+		ValidateTransferDestination(destinationInventory, destinationIndex);
+		ItemInstance source = _slots[sourceIndex];
+		if ((ReferenceEquals(this, destinationInventory) && sourceIndex == destinationIndex)
+			|| count < 1 || source == null || count >= source.Count)
 			return false;
 
-		ItemInstance source = _slots[sourceIndex];
-		source.Count -= count;
-		_slots[destinationIndex] = new ItemInstance(
-			source.QualifiedId,
-			count,
-			source.Quality,
-			source.Durability);
+		ItemInstance destination = destinationInventory._slots[destinationIndex];
+		if (destination == null)
+		{
+			destinationInventory._slots[destinationIndex] = new ItemInstance(
+				source.QualifiedId, count, source.Quality, source.Durability);
+			source.Count -= count;
+			return true;
+		}
+
+		int moved = GetMergeCount(source, destination, count);
+		if (moved == 0)
+			return false;
+
+		destination.Count += moved;
+		source.Count -= moved;
 		return true;
+	}
+
+	// One compatibility path for full moves and split moves; category policies own matching.
+	private int GetMergeCount(ItemInstance source, ItemInstance destination, int count)
+	{
+		ItemDefinition definition = _definitions.GetRequired(source.QualifiedId);
+		IItemCategoryBehavior behavior = _behaviors.GetRequired(definition.Category);
+		if (!behavior.CanStack(definition, destination,
+			new ItemStackKey(source.QualifiedId, source.Quality, source.Durability)))
+			return 0;
+		return Math.Min(count, Math.Max(0, GetStackLimit(definition, behavior) - destination.Count));
+	}
+
+	private void ValidateTransferDestination(Inventory destination, int slotIndex)
+	{
+		if (destination == null)
+			throw new ArgumentNullException(nameof(destination));
+		destination.ValidateSlotIndex(slotIndex);
+		if (!ReferenceEquals(_definitions, destination._definitions)
+			|| !ReferenceEquals(_behaviors, destination._behaviors))
+			throw new ArgumentException("Transfers require shared item definitions and category behaviors.", nameof(destination));
 	}
 
 	public int GetItemCount(string qualifiedId, int? quality = null)

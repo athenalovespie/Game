@@ -17,6 +17,16 @@ static class InventoryChecks
         var inventory = new Inventory(definitions, behaviors, Inventory.PlayerCapacity);
         var hotbar = new Hotbar(inventory);
         var panel = new InventoryPanel(inventory, hotbar, null, null);
+        var viewport = new Viewport(0, 0, 1280, 720);
+        var mouse = new MouseInput();
+        void Pointer(int slot, bool down)
+        {
+            Point position = InventoryLayout.ForInventory(viewport).GetSlotBounds(slot).Center;
+            mouse.Update(new MouseState(position.X, position.Y, 0,
+                down ? ButtonState.Pressed : ButtonState.Released, ButtonState.Released,
+                ButtonState.Released, ButtonState.Released, ButtonState.Released));
+            panel.Update(new GameTime(), new UIInput(default, default, mouse), viewport);
+        }
         check(inventory.Capacity == 30 && hotbar.SelectedItem == null, "new player has 30 slots and an empty selected slot");
 
         Keys[] keys = { Keys.D1, Keys.D2, Keys.D3, Keys.D4, Keys.D5, Keys.D6, Keys.D7, Keys.D8, Keys.D9, Keys.D0 };
@@ -35,15 +45,15 @@ static class InventoryChecks
 
         inventory.AddItem("(O)wood", 12);
         inventory.MoveItem(0, 29);
-        panel.ClickSlot(29);
-        panel.ClickSlot(9);
+        Pointer(29, true);
+        Pointer(9, false);
         check(hotbar.SelectedSlot == 9 && hotbar.SelectedItem == inventory.GetSlot(9)
             && hotbar.SelectedItem.Count == 12 && inventory.GetSlot(29) == null,
             "last storage slot moves into hotbar without duplicating items");
 
         inventory.AddItem("(O)blackberry", 2);
-        panel.ClickSlot(0);
-        panel.ClickSlot(9);
+        Pointer(0, true);
+        Pointer(9, false);
         check(hotbar.SelectedItem.QualifiedId == "(O)blackberry" && inventory.GetSlot(0).QualifiedId == "(O)wood",
             "swapping hotbar items immediately changes the selected item");
         check(!hotbar.TryUseSelectedItem(null) && hotbar.SelectedItem.Count == 2,
@@ -54,13 +64,13 @@ static class InventoryChecks
             "consuming last item leaves selected slot empty");
 
         inventory.SplitStack(0, 10, 5);
-        panel.ClickSlot(10);
-        panel.ClickSlot(0);
+        Pointer(10, true);
+        Pointer(0, false);
         check(inventory.GetSlot(0).Count == 12 && inventory.GetSlot(10) == null,
             "matching stacks merge across storage and hotbar");
         inventory.AddItem("(O)wood", 180); // 99, 93: merge only the six items that fit.
-        panel.ClickSlot(0);
-        panel.ClickSlot(1);
+        Pointer(0, true);
+        Pointer(1, false);
         check(inventory.GetSlot(0).Count == 93 && inventory.GetSlot(1).Count == 99
             && inventory.GetItemCount("(O)wood") == 192, "partial merge keeps all leftover items");
 
@@ -69,20 +79,18 @@ static class InventoryChecks
         menus.Register(MenuType.Inventory, panel);
         menus.Register(MenuType.Pause, new PauseMenu(null));
         menus.Open(MenuType.Inventory);
-        panel.ClickSlot(0);
+        Pointer(0, true);
         menus.Open(MenuType.Pause);
         menus.Open(MenuType.Inventory);
-        panel.ClickSlot(20);
+        Pointer(20, false);
         check(inventory.GetSlot(20) == null && inventory.GetSlot(0).Count == 93,
             "switching menus cancels pending move without losing items");
-        panel.ClickSlot(0);
+        Pointer(0, true);
         menus.Close();
         menus.Open(MenuType.Inventory);
-        panel.ClickSlot(20);
+        Pointer(20, false);
         check(inventory.GetSlot(20) == null, "closing inventory cancels pending move");
 
-        var viewport = new Viewport(0, 0, 1280, 720);
-        var mouse = new MouseInput();
         menus.Update(new GameTime(), new UIInput(new KeyboardState(Keys.D0), default, mouse), viewport);
         check(hotbar.SelectedSlot == 9, "number keys select while inventory is open");
         menus.Open(MenuType.Pause);
