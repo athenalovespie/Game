@@ -14,6 +14,10 @@ public sealed class ItemSlotRenderer
     private readonly SpriteFont font;
     private readonly Texture2D highlight;
 
+    public SpriteFont CaptionFont => font;
+    public static float GetCaptionScale(Vector2 measuredSize, float maxWidth) =>
+        Math.Min(0.65f, maxWidth / Math.Max(1, measuredSize.X));
+
     public ItemSlotRenderer(ItemDefinitionRegistry definitions, Func<string, Texture2D> loadIcon,
         SpriteFont font, Texture2D highlight)
     {
@@ -63,8 +67,12 @@ public sealed class ItemSlotRenderer
 
     public void DrawCaption(SpriteBatch batch, string text, Vector2 center, float maxWidth)
     {
-        Vector2 size = font.MeasureString(text);
-        float scale = Math.Min(0.65f, maxWidth / Math.Max(1, size.X));
+        DrawCaption(batch, text, font.MeasureString(text), center, maxWidth);
+    }
+
+    public void DrawCaption(SpriteBatch batch, string text, Vector2 size, Vector2 center, float maxWidth)
+    {
+        float scale = GetCaptionScale(size, maxWidth);
         Vector2 position = center - size * scale / 2;
         batch.DrawString(font, text, position + Vector2.One, Color.Black,
             0, Vector2.Zero, scale, SpriteEffects.None, 0);

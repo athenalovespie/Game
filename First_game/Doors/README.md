@@ -33,7 +33,7 @@ world GameTime, and player facing uses cached idle-animation literals.
 2. No scene editor nodes, attached components, new textures or MGCB entries are needed.
    Game1.LoadContent constructs and connects the systems using the existing player,
    font, pixel texture, house sprite and exterior WorldGrid.
-3. Open Content/doors.json. InteractionKey defaults to E and InventoryKey to I.
+3. Open Content/doors.json. InteractionKey defaults to E and InventoryKey to Tab.
    Use distinct MonoGame Keys names. FadeSeconds is the duration of each half of the fade.
 4. The exterior house footprint is x=400..1500, y=100..500. Its front-door trigger
    is [870, 500, 160, 90], directly in front of the artwork's central door.

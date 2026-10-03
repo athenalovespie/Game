@@ -5,7 +5,7 @@
 - **1, 2, 3, 4, 5, 6, 7, 8, 9, 0:** select hotbar slots 1 through 10. Numpad keys also work.
 - **Left-click the hotbar:** select that slot.
 - **E:** interact with an in-range door.
-- **I:** open or close the inventory. Its top row contains the same ten slots as the hotbar.
+- **Tab:** open or close the inventory. Its top row contains the same ten slots as the hotbar.
 - **Inside the inventory:** hold the left mouse button on an item, drag, and release over a destination. Compatible stacks merge; different items swap.
 - **Alt+drag:** move half a stack, rounded down (a single item cannot split). The source immediately displays the remaining half. Split drops merge up to the limit; excess stays at the source. Incompatible or full destinations cancel the split.
 - **Right-click, release outside the slots, or release over the source:** cancel the drag. Closing/switching menus, changing pages, and losing window focus also cancel.
@@ -37,7 +37,7 @@ The 30-slot player inventory fits on one page. When displaying an older 36-slot 
 
 ## Input and drawing order
 
-Game1 samples the mouse once, updates menus, then updates the hotbar if no menu consumed input. Inventory and Crafting block movement and collection while allowing respawn timers to continue. Pause also stops world timers and camera updates. I/C do not switch menus while paused.
+Game1 samples the mouse once, updates menus, then updates the hotbar if no menu consumed input. Inventory and Crafting block movement and collection while allowing respawn timers to continue. Pause also stops world timers and camera updates. Tab/C do not switch menus while paused.
 
 Hovering over the hotbar blocks mouse interactions with the world behind it while allowing movement. Closing a menu consumes that frame's input to prevent clicks from reaching world objects.
 

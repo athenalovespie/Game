@@ -10,7 +10,19 @@ public class InputBindings
     public Keys Left { get; set; } = Keys.A;
     public Keys Right { get; set; } = Keys.D;
     public Keys Up { get; set; } = Keys.W;
-    public Keys Inventory { get; set; } = Keys.I;
+    private Keys inventory = Keys.Tab;
+    public Keys Inventory
+    {
+        get => inventory;
+        set
+        {
+            if (inventory == value) return;
+            inventory = value;
+            InventoryChanged?.Invoke();
+        }
+    }
+
+    public event Action InventoryChanged;
 
     public Keys Interact
     {

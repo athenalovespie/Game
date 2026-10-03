@@ -42,6 +42,7 @@ public class Game1 : Core
     private Texture2D gridPixel;
     private Func<string, Texture2D> itemTextureLoader;
     private UIManager uiManager;
+    private InventoryPanel inventoryPanel;
     private Hotbar hotbar;
     private HotbarPanel hotbarPanel;
     private readonly MouseInput mouseInput = new MouseInput();
@@ -162,9 +163,10 @@ public class Game1 : Core
 
         cat = new Player(animations);
         uiManager = new UIManager(gridPixel, cat.Input);
-        uiManager.Register(MenuType.Inventory, new InventoryPanel(
-            inventory, hotbar, inventoryBackground, itemSlots, inventoryDrag));
-        uiManager.Register(MenuType.Crafting, new CraftingPanel(hudFont));
+        inventoryPanel = new InventoryPanel(
+            inventory, hotbar, inventoryBackground, itemSlots, inventoryDrag, cat.Input);
+        uiManager.Register(MenuType.Inventory, inventoryPanel);
+        uiManager.Register(MenuType.Crafting, new CraftingPanel(hudFont, cat.Input));
         uiManager.Register(MenuType.Pause, new PauseMenu(hudFont));
         cat.Position = new Vector2(100, 1200);
         cat.Scale = 0.5f;
@@ -228,7 +230,7 @@ public class Game1 : Core
         doors = DoorConfiguration.Preload(
             Path.Combine(AppContext.BaseDirectory, "Content", "doors.json"),
             cat, worldGrid, LogDoorError);
-        doorOverlay = new DoorOverlay(doors, gridPixel, hudFont);
+        doorOverlay = new DoorOverlay(doors, gridPixel, inventoryPanel);
         doors.AreaChanged += OnAreaChanged;
 
         pickupSystem.RegisterNodes(WorldSpawnCatalog.CreateNodes());

@@ -72,7 +72,7 @@ static class InventoryDragChecks
             check(!h.Drag.IsDragging && h.Items.GetSlot(0).Count == 9,
                 "pointer release outside inventory snaps back, split=" + split);
 
-            foreach (Keys closeKey in new[] { Keys.Escape, Keys.I, Keys.P, Keys.C })
+            foreach (Keys closeKey in new[] { Keys.Escape, Keys.Tab, Keys.P, Keys.C })
             {
                 h = new Harness();
                 h.Items.AddItem("(O)wood", 9);

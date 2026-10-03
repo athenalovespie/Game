@@ -1,5 +1,6 @@
 using System;
 using First_game.Input;
+using MonoGameLibrary.Input;
 using First_game.Inventory;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -16,6 +17,18 @@ public sealed class InventoryPanel : IMenuPanel
     private readonly Texture2D background;
     private readonly ItemSlotRenderer slots;
     private readonly InventoryDragController drag;
+    private readonly InputBindings bindings;
+    private const string DragHint = "Release over a slot to move. Right-click to cancel.";
+    private readonly Vector2 dragHintSize;
+    private Vector2 closeHintSize;
+    private Vector2 pageCaptionSize;
+
+    public string CloseHint { get; private set; }
+    public SpriteFont CaptionFont => slots?.CaptionFont;
+
+    // The door prompt uses the exact footer scale, including narrow-window fitting.
+    public float GetHintScale(Viewport viewport) => ItemSlotRenderer.GetCaptionScale(
+        closeHintSize, InventoryLayout.ForInventory(viewport).Bounds.Width);
     private int hoveredSlot = -1;
     private int page;
     private string pageCaption;
@@ -25,13 +38,18 @@ public sealed class InventoryPanel : IMenuPanel
         (inventory.Capacity - Hotbar.SlotCount) / (float)InventoryLayout.StorageSlotsPerPage));
 
     public InventoryPanel(PlayerInventory inventory, Hotbar hotbar,
-        Texture2D background, ItemSlotRenderer slots, InventoryDragController drag = null)
+        Texture2D background, ItemSlotRenderer slots, InventoryDragController drag = null,
+        InputBindings bindings = null)
     {
         this.inventory = inventory;
         this.hotbar = hotbar;
         this.background = background;
         this.slots = slots;
         this.drag = drag ?? new InventoryDragController();
+        this.bindings = bindings ?? new InputBindings();
+        this.bindings.InventoryChanged += RefreshCloseHint;
+        dragHintSize = CaptionFont?.MeasureString(DragHint) ?? Vector2.Zero;
+        RefreshCloseHint();
         UpdatePageCaption();
     }
 
@@ -85,13 +103,12 @@ public sealed class InventoryPanel : IMenuPanel
                 visibleSlot < Hotbar.SlotCount ? visibleSlot : -1);
         }
 
-        string hint = drag.IsDragging
-            ? "Release over a slot to move. Right-click to cancel."
-            : "Drag items to move. Alt+drag: split half. E: close.";
-        slots.DrawCaption(batch, hint, new Vector2(layout.Bounds.Center.X, layout.Bounds.Bottom + 24),
+        string hint = drag.IsDragging ? DragHint : CloseHint;
+        Vector2 hintSize = drag.IsDragging ? dragHintSize : closeHintSize;
+        slots.DrawCaption(batch, hint, hintSize, new Vector2(layout.Bounds.Center.X, layout.Bounds.Bottom + 24),
             layout.Bounds.Width);
         if (PageCount > 1)
-            slots.DrawCaption(batch, pageCaption,
+            slots.DrawCaption(batch, pageCaption, pageCaptionSize,
                 new Vector2(layout.Bounds.Center.X, layout.Bounds.Bottom + 55), layout.Bounds.Width);
         if (hoveredSlot >= 0 && inventory.GetSlot(hoveredSlot) != null)
             slots.DrawCaption(batch, slots.GetItemName(inventory.GetSlot(hoveredSlot)),
@@ -107,9 +124,16 @@ public sealed class InventoryPanel : IMenuPanel
         }
     }
 
+    private void RefreshCloseHint()
+    {
+        CloseHint = "Drag items to move. Alt+drag: split half. " + bindings.Inventory + ": close.";
+        closeHintSize = CaptionFont?.MeasureString(CloseHint) ?? Vector2.Zero;
+    }
+
     private void UpdatePageCaption()
     {
         captionPageCount = PageCount;
         pageCaption = $"Storage page {page + 1}/{captionPageCount} - Page Up / Page Down";
+        pageCaptionSize = CaptionFont?.MeasureString(pageCaption) ?? Vector2.Zero;
     }
 }

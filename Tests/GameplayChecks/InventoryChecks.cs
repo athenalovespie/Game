@@ -16,7 +16,8 @@ static class InventoryChecks
         definitions.ResolveUseEffects(UseEffectRegistry.CreateBuiltIns(), behaviors);
         var inventory = new Inventory(definitions, behaviors, Inventory.PlayerCapacity);
         var hotbar = new Hotbar(inventory);
-        var panel = new InventoryPanel(inventory, hotbar, null, null);
+        var bindings = new InputBindings();
+        var panel = new InventoryPanel(inventory, hotbar, null, null, bindings: bindings);
         var viewport = new Viewport(0, 0, 1280, 720);
         var mouse = new MouseInput();
         void Pointer(int slot, bool down)
@@ -75,7 +76,7 @@ static class InventoryChecks
             && inventory.GetItemCount("(O)wood") == 192, "partial merge keeps all leftover items");
 
         // Closing or replacing a menu must cancel any pending item transfer.
-        var menus = new UIManager(null);
+        var menus = new UIManager(null, bindings);
         menus.Register(MenuType.Inventory, panel);
         menus.Register(MenuType.Pause, new PauseMenu(null));
         menus.Open(MenuType.Inventory);
@@ -99,6 +100,36 @@ static class InventoryChecks
         menus.Update(new GameTime(), new UIInput(new KeyboardState(Keys.Escape), default, mouse), viewport);
         check(menus.ActiveMenu == MenuType.None && menus.ConsumedInputThisFrame,
             "menu closing frame still blocks world input");
+
+        var time = new GameTime();
+        var tab = new KeyboardState(Keys.Tab);
+        menus.Update(time, new UIInput(tab, default, mouse), viewport);
+        check(menus.ActiveMenu == MenuType.Inventory && panel.CloseHint.EndsWith("Tab: close."),
+            "default Tab opens inventory and matches the cached close hint");
+        menus.Update(time, new UIInput(tab, tab, mouse), viewport);
+        check(menus.ActiveMenu == MenuType.Inventory, "held Tab does not close inventory");
+        menus.Update(time, new UIInput(new KeyboardState(Keys.E), default, mouse), viewport);
+        check(menus.ActiveMenu == MenuType.Inventory && menus.ConsumedInputThisFrame,
+            "E leaves inventory open and remains consumed by the menu");
+        menus.Update(time, new UIInput(new KeyboardState(Keys.I), default, mouse), viewport);
+        check(menus.ActiveMenu == MenuType.Inventory, "old I binding no longer toggles inventory");
+        menus.Update(time, new UIInput(default, tab, mouse), viewport);
+        menus.Update(time, new UIInput(tab, default, mouse), viewport);
+        check(menus.ActiveMenu == MenuType.None && menus.ConsumedInputThisFrame,
+            "fresh Tab closes inventory and consumes the closing frame");
+        menus.Update(time, new UIInput(tab, tab, mouse), viewport);
+        check(menus.ActiveMenu == MenuType.None, "held Tab does not reopen inventory");
+        bindings.Inventory = Keys.O;
+        check(panel.CloseHint.EndsWith("O: close."), "rebinding refreshes the inventory hint");
+        string cachedHint = panel.CloseHint;
+        bindings.Inventory = Keys.O;
+        check(ReferenceEquals(cachedHint, panel.CloseHint), "unchanged binding preserves cached hint");
+        menus.Update(time, new UIInput(tab, default, mouse), viewport);
+        check(menus.ActiveMenu == MenuType.None, "old default stops toggling after rebind");
+        menus.Update(time, new UIInput(new KeyboardState(Keys.O), default, mouse), viewport);
+        check(menus.ActiveMenu == MenuType.Inventory, "configured inventory key toggles the menu");
+        menus.Close();
+        bindings.Inventory = Keys.Tab;
 
         var restored = Inventory.LoadFromJson(inventory.SaveToJson(), definitions, behaviors);
         check(restored.Capacity == 30 && restored.GetSlot(0).Count == 93 && restored.GetSlot(1).Count == 99,

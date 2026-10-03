@@ -13,7 +13,7 @@ namespace First_game.Doors;
 public sealed class DoorConfiguration
 {
     public Keys InteractionKey { get; set; } = Keys.E;
-    public Keys InventoryKey { get; set; } = Keys.I;
+    public Keys InventoryKey { get; set; } = Keys.Tab;
     public float FadeSeconds { get; set; } = .25f;
     public AreaDefinition[] Areas { get; set; } = Array.Empty<AreaDefinition>();
     public DoorDefinition[] Doors { get; set; } = Array.Empty<DoorDefinition>();
