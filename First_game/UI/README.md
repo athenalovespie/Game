@@ -14,6 +14,8 @@ The player has 30 slots: ten in the hotbar and twenty below it. Collected items 
 
 The supplied `Hudbar.png`, `Highlight.png`, and `Inventory.png` are used directly. The UI scales with the viewport. Stack counts, slot key labels, and the selected item's name are drawn over/near the artwork.
 
+The selection highlight appears only on the bottom hotbar. Inventory slots have no selection or drag-source highlight.
+
 ## Where the code lives
 
 | File | Responsibility |

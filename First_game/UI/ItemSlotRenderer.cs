@@ -8,7 +8,6 @@ namespace First_game.UI;
 /// <summary>Draws item icons, counts, key labels, and the supplied selection artwork.</summary>
 public sealed class ItemSlotRenderer
 {
-    private static readonly string[] KeyLabels = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0" };
     private static readonly Color Ink = new(65, 49, 30);
     private readonly ItemDefinitionRegistry definitions;
     private readonly Func<string, Texture2D> loadIcon;
@@ -25,10 +24,10 @@ public sealed class ItemSlotRenderer
     }
 
     public void Draw(SpriteBatch batch, Rectangle bounds, ItemInstance item, int keySlot = -1,
-        bool selected = false, bool moving = false)
+        bool selected = false)
     {
         float textScale = Math.Min(0.65f, bounds.Width / 150f);
-        float padding = Math.Max(3, bounds.Width * 0.07f);
+        float padding = Math.Max(3, bounds.Width * 0.1f);
         if (item != null)
         {
             ItemDefinition definition = definitions.GetRequired(item.QualifiedId);
@@ -57,14 +56,9 @@ public sealed class ItemSlotRenderer
             }
         }
 
-        if (keySlot >= 0)
-            batch.DrawString(font, KeyLabels[keySlot],
-                new Vector2(bounds.X + padding, bounds.Y + padding), Ink,
-                0, Vector2.Zero, textScale, SpriteEffects.None, 0);
-
-        // Draw the transparent frame last so it sits above the bar and item icon.
-        if (selected || moving)
-            batch.Draw(highlight, bounds, moving ? new Color(180, 220, 255) : Color.White);
+        // Draw the selected hotbar slot's frame above the bar and item icon.
+        if (selected)
+            batch.Draw(highlight, bounds, Color.White);
     }
 
     public void DrawCaption(SpriteBatch batch, string text, Vector2 center, float maxWidth)

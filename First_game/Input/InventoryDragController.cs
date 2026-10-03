@@ -99,9 +99,6 @@ public sealed class InventoryDragController
             ? sourcePreview
             : inventory.GetSlot(slot);
 
-    public bool IsSource(PlayerInventory inventory, int slot) =>
-        IsDragging && ReferenceEquals(inventory, SourceInventory) && slot == SourceSlot;
-
     public void Cancel()
     {
         SourceInventory = null;

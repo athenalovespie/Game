@@ -69,7 +69,7 @@ public sealed class InventoryPanel : IMenuPanel
     public void OnClosed()
     {
         drag.Cancel();
-        hoveredSlot = -1;
+        // hoveredSlot = -1;
     }
 
     public void Draw(SpriteBatch batch, Viewport viewport)
@@ -82,8 +82,7 @@ public sealed class InventoryPanel : IMenuPanel
             int inventorySlot = InventoryLayout.GetInventorySlot(visibleSlot, page);
             if (inventorySlot >= inventory.Capacity) continue;
             slots.Draw(batch, layout.GetSlotBounds(visibleSlot), drag.GetDisplayedItem(inventory, inventorySlot),
-                visibleSlot < Hotbar.SlotCount ? visibleSlot : -1,
-                selected: inventorySlot == hotbar.SelectedSlot, moving: drag.IsSource(inventory, inventorySlot));
+                visibleSlot < Hotbar.SlotCount ? visibleSlot : -1);
         }
 
         string hint = drag.IsDragging
