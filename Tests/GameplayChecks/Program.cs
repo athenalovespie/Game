@@ -122,6 +122,7 @@ static class Checks
         fishing.TryInteract(Water);
         Check(fishing.Active is CustomFishing, "factory starts user-defined fishing action");
         player.Actions.Cancel();
+        DoorChecks.Run(Check);
         InventoryChecks.Run(Check);
         InventoryDragChecks.Run(Check);
         Console.WriteLine($"{passed} gameplay checks passed.");

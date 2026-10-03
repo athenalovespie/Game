@@ -1,0 +1,80 @@
+{
+  "InteractionKey": "E",
+  "InventoryKey": "I",
+  "FadeSeconds": 0.25,
+  "Areas": [
+    {
+      "Id": "exterior",
+      "Spawns": [
+        {
+          "Id": "front-step",
+          "Ground": [
+            950,
+            675
+          ],
+          "Facing": [
+            0,
+            1
+          ]
+        }
+      ]
+    },
+    {
+      "Id": "house",
+      "Floor": [
+        0,
+        0,
+        1000,
+        700
+      ],
+      "WallThickness": 32,
+      "Spawns": [
+        {
+          "Id": "entry",
+          "Ground": [
+            500,
+            480
+          ],
+          "Facing": [
+            0,
+            -1
+          ]
+        }
+      ]
+    }
+  ],
+  "Doors": [
+    {
+      "Id": "front-door",
+      "SourceArea": "exterior",
+      "Trigger": [
+        870,
+        500,
+        160,
+        90
+      ],
+      "AccessBounds": [
+        770,
+        500,
+        360,
+        300
+      ],
+      "TargetArea": "house",
+      "TargetSpawn": "entry",
+      "IsExit": false
+    },
+    {
+      "Id": "house-exit",
+      "SourceArea": "house",
+      "Trigger": [
+        425,
+        588,
+        150,
+        80
+      ],
+      "TargetArea": "exterior",
+      "TargetSpawn": "front-step",
+      "IsExit": true
+    }
+  ]
+}

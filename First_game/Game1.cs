@@ -1,4 +1,3 @@
-﻿
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -15,6 +14,9 @@ using First_game.UI;
 using MonoGameLibrary.Input;
 using First_game.Actions;
 using First_game.Fishing;
+using First_game.Doors;
+using System.IO;
+using System.Diagnostics;
 
 namespace First_game;
 
@@ -46,19 +48,20 @@ public class Game1 : Core
     private TimeSpan worldElapsed;
     private FishingController fishing;
     private FishingOverlay fishingOverlay;
+    private DoorSystem doors;
+    private DoorOverlay doorOverlay;
+    private readonly GameTime worldTime = new GameTime();
 
     public Game1() : base("Game1" , 1280 , 720, false)
     {
 
     }
-//chat gpt
     private readonly WorldGrid worldGrid = new WorldGrid(
     cellSize: 100,
     origin: new Vector2(-3000, -3000),
     columnCount: 60,
     rowCount: 60);
 
-//chat gpt
     protected override void Initialize()
     {
         var display = GraphicsAdapter.DefaultAdapter.CurrentDisplayMode;
@@ -70,7 +73,6 @@ public class Game1 : Core
 
         base.Initialize();
     }
-// to see the grid lines
     private void DrawGrid()
 {
     int left = (int)worldGrid.Origin.X;
@@ -104,9 +106,9 @@ public class Game1 : Core
 
 
     protected override void LoadContent()
-    { 
+    {
         gridPixel = new Texture2D(GraphicsDevice, 1, 1);
-        gridPixel.SetData(new[] { Color.White });  
+        gridPixel.SetData(new[] { Color.White });
         gridPlacer = new GridPlacer(worldGrid);
         itemTextureLoader = assetName => Content.Load<Texture2D>(assetName);
         var catTexture = Content.Load<Texture2D>("Images/startercat");
@@ -136,11 +138,7 @@ public class Game1 : Core
         var itemSlots = new ItemSlotRenderer(itemDefinitions, itemTextureLoader, hudFont, selectionHighlight);
         var inventoryDrag = new InventoryDragController();
         hotbarPanel = new HotbarPanel(inventory, hotbar, hotbarBackground, itemSlots, inventoryDrag);
-        uiManager = new UIManager(gridPixel);
-        uiManager.Register(MenuType.Inventory, new InventoryPanel(
-            inventory, hotbar, inventoryBackground, itemSlots, inventoryDrag));
-        uiManager.Register(MenuType.Crafting, new CraftingPanel(hudFont));
-        uiManager.Register(MenuType.Pause, new PauseMenu(hudFont));
+
 
         var walkTextureRight = Content.Load<Texture2D>("Images/Right_walk");
         var walkTextureLeft = Content.Load<Texture2D>("Images/Left_walk");
@@ -161,14 +159,18 @@ public class Game1 : Core
             { "Back_Idle", new Animation(
                 Content.Load<Texture2D>("Images/Back_Idle"), 2) { FrameDuration = 0.7f }},
         };
-    
+
         cat = new Player(animations);
+        uiManager = new UIManager(gridPixel, cat.Input);
+        uiManager.Register(MenuType.Inventory, new InventoryPanel(
+            inventory, hotbar, inventoryBackground, itemSlots, inventoryDrag));
+        uiManager.Register(MenuType.Crafting, new CraftingPanel(hudFont));
+        uiManager.Register(MenuType.Pause, new PauseMenu(hudFont));
         cat.Position = new Vector2(100, 1200);
         cat.Scale = 0.5f;
         cat.Speed = 300f;
         cat.CollisionSize = new Vector2(270, 64);
         cat.CollisionOffset = new Vector2(0, 331);
-        cat.IsMovementBlocked = bounds => worldGrid.IntersectsBlockedCell(bounds);
 
         //placing custom footprint for lake
         Point[] lakeFootprint = GridPlacer.CreateFootprint(
@@ -180,7 +182,7 @@ public class Game1 : Core
                 ".XXXXXXXXXXX",
                 ".XXX....XXX."
         );
-        
+
         if (!gridPlacer.TryPlaceFootprint(
         LakeTexture,
         new Vector2(-2000, 1500),
@@ -194,7 +196,7 @@ public class Game1 : Core
         throw new InvalidOperationException(
             "The lake footprint is occupied or outside the grid.");
         }
-        
+
         if (!gridPlacer.TryPlaceBuilding(
             HouseTexture,
             new Vector2(400, 150),
@@ -223,6 +225,12 @@ public class Game1 : Core
                 "The house footprint is occupied or outside the grid.");
 
         }
+        doors = DoorConfiguration.Preload(
+            Path.Combine(AppContext.BaseDirectory, "Content", "doors.json"),
+            cat, worldGrid, LogDoorError);
+        doorOverlay = new DoorOverlay(doors, gridPixel, hudFont);
+        doors.AreaChanged += OnAreaChanged;
+
         pickupSystem.RegisterNodes(WorldSpawnCatalog.CreateNodes());
 
         for (int treeIndex = 0; treeIndex < 10; treeIndex++)
@@ -232,7 +240,7 @@ public class Game1 : Core
                 random.Next(-3000, 2000));
             if (PlantCellOverlapsPlayer(TreePosition))
                 continue;
-            if (gridPlacer.TryPlaceSprite( 
+            if (gridPlacer.TryPlaceSprite(
                 TreeTexture,
                 TreePosition,
                 CellType.Plant,
@@ -270,7 +278,7 @@ public class Game1 : Core
         fishing.Register(new FishingSpot(worldGrid, Lake.GetOccupiedCells(), "(O)fish", new FishingSettings()));
         fishingOverlay = new FishingOverlay(gridPixel);
         mouseInteractions.TryInteract = fishing.TryInteract;
-    
+
         background = new Sprite(mapTexture);
         background.Scale = 2.0f;
         background.Position = new Vector2(620, 360);
@@ -289,50 +297,81 @@ public class Game1 : Core
         mouseInput.Update();
         var currentKeyboard = Keyboard.GetState();
         var uiInput = new UIInput(currentKeyboard, _previousKeyboard, mouseInput);
-        uiManager.Update(gameTime,
-            uiInput,
-            GraphicsDevice.Viewport);
+        bool wasTransitioning = doors.IsTransitioning;
 
-        // Menus own their input; hovering the HUD only blocks mouse interactions,
-        // so walking still works while the cursor rests on the hotbar.
+        // Continue sampling input during fades, but consume it without buffering.
+        if (!wasTransitioning && IsActive)
+            uiManager.Update(gameTime, uiInput, GraphicsDevice.Viewport);
+
+        bool blocked = wasTransitioning || !IsActive || uiManager.ConsumedInputThisFrame;
         bool mouseOverHotbar = false;
-        if (!uiManager.ConsumedInputThisFrame)
+        if (!blocked)
             mouseOverHotbar = hotbarPanel.Update(uiInput, GraphicsDevice.Viewport);
 
-        if (uiManager.ExitRequested
+        if ((!wasTransitioning && uiManager.ExitRequested)
             || GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed)
             Exit();
 
-        // Respawn timers advance in ordinary menus, but stop during Pause.
-        if (!uiManager.PausesWorld)
+        // The inactive exterior retains its objects and its exact respawn clock.
+        bool advanceExterior = doors.ActiveArea.IsExterior
+            && !wasTransitioning && !uiManager.PausesWorld;
+        if (advanceExterior)
             worldElapsed += gameTime.ElapsedGameTime;
-        var worldTime = new GameTime(worldElapsed,
-            uiManager.PausesWorld ? TimeSpan.Zero : gameTime.ElapsedGameTime);
-        if (!uiManager.PausesWorld)
+        worldTime.TotalGameTime = worldElapsed;
+        worldTime.ElapsedGameTime = advanceExterior ? gameTime.ElapsedGameTime : TimeSpan.Zero;
+        if (advanceExterior)
             pickupSystem.Update(worldTime);
 
-        // Route interactions before movement so a new action locks movement immediately.
-        mouseInteractions.Update(
-            worldTime, GraphicsDevice.Viewport, cat.GroundPosition,
-            uiManager.ConsumedInputThisFrame || mouseOverHotbar || cat.Actions.IsBusy);
-
-        // All menus freeze actions, including their animations and minigame clocks.
-        if (!uiManager.ConsumedInputThisFrame)
+        doors.SetInteractionEnabled(!blocked && !cat.Actions.IsBusy);
+        if (!blocked)
         {
+            // Resolve movement/trigger exits before E, including an exit on this frame.
             cat.Update(gameTime);
             cat.Actions.Update(gameTime, ActionInput.FromKeyboard(currentKeyboard, _previousKeyboard));
-            fishing.Update(gameTime);
+            if (doors.ActiveArea.IsExterior)
+                fishing.Update(gameTime);
         }
+        doors.SetInteractionEnabled(!blocked && !cat.Actions.IsBusy);
+        doors.Update((float)gameTime.ElapsedGameTime.TotalSeconds, uiInput);
 
-        if (!uiManager.PausesWorld)
+        if (doors.ActiveArea.IsExterior)
+            mouseInteractions.Update(worldTime, GraphicsDevice.Viewport, cat.GroundPosition,
+                blocked || doors.IsTransitioning || mouseOverHotbar || cat.Actions.IsBusy);
+
+        // A right-click may have started an action after the door update.
+        doors.SetInteractionEnabled(!blocked && !doors.IsTransitioning && !cat.Actions.IsBusy);
+        if (!uiManager.PausesWorld && !wasTransitioning && !doors.IsTransitioning)
         {
             camera.UpdateTarget(cat.Position);
             camera.Update(gameTime);
         }
 
         _previousKeyboard = currentKeyboard;
-
         base.Update(gameTime);
+    }
+
+    private void OnAreaChanged()
+    {
+        // Teleports must not interpolate the camera across unrelated areas.
+        camera.Position = cat.Position;
+        camera.TargetPosition = cat.Position;
+    }
+
+    private static void LogDoorError(string message)
+    {
+        Trace.TraceError(message);
+        Console.Error.WriteLine(message);
+    }
+
+    protected override void UnloadContent()
+    {
+        if (doors != null)
+        {
+            doors.AreaChanged -= OnAreaChanged;
+            doors.Dispose();
+        }
+        gridPixel?.Dispose();
+        base.UnloadContent();
     }
 
     private bool PlantCellOverlapsPlayer(Vector2 position)
@@ -344,55 +383,38 @@ public class Game1 : Core
 
     protected override void Draw(GameTime gameTime)
     {
-        GraphicsDevice.Clear(Color.White);
-
-
+        GraphicsDevice.Clear(doors.ActiveArea.IsExterior ? Color.White : new Color(31, 27, 26));
         Matrix transformMatrix = camera.GetTransform(GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
-        // Begin the sprite batch to prepare for rendering.
         SpriteBatch.Begin(transformMatrix: transformMatrix);
 
-        background.Draw(SpriteBatch);
-        if (Lake != null)
+        if (doors.ActiveArea.IsExterior)
         {
-            Lake.Sprite.Draw(SpriteBatch);
+            background.Draw(SpriteBatch);
+            Lake?.Sprite.Draw(SpriteBatch);
+            worldRenderer.Submit(House.SortY, House.Draw);
+            worldRenderer.Submit(Tent.SortY, Tent.Draw);
+            foreach (Sprite tree in trees)
+                worldRenderer.Submit(tree.SortY, tree.Draw);
+            foreach (Sprite pine in pines)
+                worldRenderer.Submit(pine.SortY, pine.Draw);
+            pickupSystem.SubmitDraw(worldRenderer);
+            worldRenderer.Submit(cat.Bounds.Bottom, cat.Draw);
+            worldRenderer.Draw(SpriteBatch);
+            fishingOverlay.DrawWorld(SpriteBatch, cat, fishing.Active);
+            DrawGrid();
         }
-        worldRenderer.Submit(House.SortY, House.Draw);
-        worldRenderer.Submit(Tent.SortY, Tent.Draw);
-
-        foreach (Sprite tree in trees)
+        else
         {
-            worldRenderer.Submit(tree.SortY, tree.Draw);
+            doors.ActiveArea.Draw(SpriteBatch, gridPixel);
+            cat.Draw(SpriteBatch);
         }
 
-        foreach (Sprite pine in pines)
-        {
-            worldRenderer.Submit(pine.SortY, pine.Draw);
-        }
-
-        pickupSystem.SubmitDraw(worldRenderer);
-
-        // Submit the player last so it draws in front when ground positions tie.
-        worldRenderer.Submit(cat.Bounds.Bottom, cat.Draw);
-        worldRenderer.Draw(SpriteBatch);
-        fishingOverlay.DrawWorld(SpriteBatch, cat, fishing.Active);
-        DrawGrid();
-   
-        // Always end the sprite batch when finished.
         SpriteBatch.End();
         SpriteBatch.Begin();
-
         hotbarPanel.Draw(SpriteBatch, GraphicsDevice.Viewport);
         uiManager.Draw(SpriteBatch, GraphicsDevice.Viewport);
-
+        doorOverlay.Draw(SpriteBatch, GraphicsDevice.Viewport);
         SpriteBatch.End();
-
-
-        // TODO: Add your drawing code here
-
         base.Draw(gameTime);
     }
-
 }
-
-// Hello cutsy, I added this comment
-//This is bby, we are doing a new test

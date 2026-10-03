@@ -1,4 +1,5 @@
 using System;
+using MonoGameLibrary.Input;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -10,6 +11,7 @@ public sealed class UIManager
 {
     private readonly Dictionary<MenuType, IMenuPanel> panels = new();
     private readonly Texture2D pixel;
+    private readonly InputBindings bindings;
 
     public MenuType ActiveMenu { get; private set; }
     public bool BlocksWorldInput => ActiveMenu != MenuType.None;
@@ -17,9 +19,10 @@ public sealed class UIManager
     public bool ExitRequested { get; private set; }
     public bool ConsumedInputThisFrame { get; private set; }
 
-    public UIManager(Texture2D pixel)
+    public UIManager(Texture2D pixel, InputBindings bindings = null)
     {
         this.pixel = pixel;
+        this.bindings = bindings ?? new InputBindings();
     }
 
     public void Register(MenuType menu, IMenuPanel panel)
@@ -67,7 +70,7 @@ public sealed class UIManager
         }
         else if (input.Pressed(Keys.P))
             Toggle(MenuType.Pause);
-        else if (!PausesWorld && input.Pressed(Keys.E))
+        else if (!PausesWorld && input.Pressed(bindings.Inventory))
             Toggle(MenuType.Inventory);
         else if (!PausesWorld && input.Pressed(Keys.C))
             Toggle(MenuType.Crafting);

@@ -29,4 +29,7 @@
   <ItemGroup>
     <ProjectReference Include="..\MonoGameLibrary\MonoGameLibrary.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Update="Content/doors.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

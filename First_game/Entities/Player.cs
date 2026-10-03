@@ -1,4 +1,3 @@
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -47,23 +46,31 @@ public class Player
 
     public Func<Rectangle, bool> IsMovementBlocked { get; set; }
 
-    public Rectangle Bounds
+    public bool InputLocked { get; set; }
+    public event Action PositionChanged;
+
+    public Rectangle Bounds => BoundsAt(Position);
+
+    public Rectangle BoundsAt(Vector2 position)
     {
-        get
-        {
-            // Rectangle source = _sprite.SourceRectangle
-            //     ?? new Rectangle(0, 0, _sprite.Texture.Width, _sprite.Texture.Height);
             float width = (CollisionSize.X * Scale);
             float height = (CollisionSize.Y * Scale);
 
-            Vector2 collisionCenter = Position + CollisionOffset*Scale;
+            Vector2 collisionCenter = position + CollisionOffset*Scale;
 
             return new Rectangle(
                 (int)(collisionCenter.X - width * 0.5f),
                 (int)(collisionCenter.Y - height * 0.5f),
                 (int)width,
                 (int)height);
-        }
+    }
+
+    public Vector2 PositionForGround(Vector2 ground)
+    {
+        float width = CollisionSize.X * Scale;
+        float height = CollisionSize.Y * Scale;
+        return new Vector2(ground.X + width * .5f - (int)width / 2,
+            ground.Y - (int)height + height * .5f) - CollisionOffset * Scale;
     }
 
     private string _idleAnimation = "Right_Idle";
@@ -71,7 +78,13 @@ public class Player
     public Vector2 Position
     {
         get { return _position; }
-        set { _position = value; }
+        set
+        {
+            if (_position == value) return;
+            Rectangle previous = Bounds;
+            _position = value;
+            if (Bounds != previous) PositionChanged?.Invoke();
+        }
     }
     public Player(Texture2D texture, Vector2 position)
     {
@@ -95,7 +108,7 @@ public class Player
     {
         _velocity = Vector2.Zero;
         var keyboard = Keyboard.GetState();
-        
+
         if (keyboard.IsKeyDown(Input.Right)) _velocity.X += 1;
         if (keyboard.IsKeyDown(Input.Left))  _velocity.X -= 1;
         if (keyboard.IsKeyDown(Input.Up))    _velocity.Y -= 1;
@@ -103,7 +116,7 @@ public class Player
 
         if (_velocity != Vector2.Zero)
             _velocity.Normalize();
-        
+
         _velocity *= Speed;
 
         float seconds = (float)gameTime.ElapsedGameTime.TotalSeconds;
@@ -112,23 +125,23 @@ public class Player
 
     public void MoveBy(Vector2 movement)
     {
-        // Small steps prevent crossing an obstacle during a long frame.
+        if (InputLocked || movement == Vector2.Zero) return;
+        Rectangle previousBounds = Bounds;
+        // Test tentative positions without sending trigger events for blocked steps.
         int steps = Math.Max(1, (int)MathF.Ceiling(
             MathF.Max(MathF.Abs(movement.X), MathF.Abs(movement.Y))));
         Vector2 step = movement / steps;
-
         for (int i = 0; i < steps; i++)
         {
-            Vector2 previous = Position;
-            Position += new Vector2(step.X, 0);
-            if (IsMovementBlocked?.Invoke(Bounds) == true)
-                Position = previous;
-
-            previous = Position;
-            Position += new Vector2(0, step.Y);
-            if (IsMovementBlocked?.Invoke(Bounds) == true)
-                Position = previous;
+            Vector2 previous = _position;
+            _position += new Vector2(step.X, 0);
+            if (IsMovementBlocked?.Invoke(Bounds) == true) _position = previous;
+            previous = _position;
+            _position += new Vector2(0, step.Y);
+            if (IsMovementBlocked?.Invoke(Bounds) == true) _position = previous;
         }
+        // Report the final bounds before this frame's interaction input is handled.
+        if (Bounds != previousBounds) PositionChanged?.Invoke();
     }
 
     protected virtual void SetAnimations()
@@ -137,8 +150,8 @@ public class Player
             {
             _idleAnimation = "Right_Idle";
             Facing = "Right";
-            _animationManager.Play(_animations["WalkRight"]); 
-            }   
+            _animationManager.Play(_animations["WalkRight"]);
+            }
         else if(_velocity.X < 0)
             {
             _idleAnimation = "Left_Idle";
@@ -177,7 +190,13 @@ public class Player
         Facing = MathF.Abs(direction.X) >= MathF.Abs(direction.Y)
             ? (direction.X >= 0 ? "Right" : "Left")
             : (direction.Y >= 0 ? "Front" : "Back");
-        _idleAnimation = Facing + "_Idle";
+        _idleAnimation = Facing switch
+        {
+            "Left" => "Left_Idle",
+            "Front" => "Front_Idle",
+            "Back" => "Back_Idle",
+            _ => "Right_Idle"
+        };
     }
 
     /// <summary>Missing action artwork falls back to the current facing's idle pose.</summary>
@@ -204,6 +223,7 @@ public class Player
     public void Update(GameTime gameTime)
     {
 
+        if (InputLocked) return;
         if (!Actions.BlocksMovement){
             Move(gameTime);
         }
@@ -214,10 +234,9 @@ public class Player
             }
             _animationManager.Update(gameTime);
         }
-              
+
     }
 
 
 
 }
-
