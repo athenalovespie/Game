@@ -16,6 +16,7 @@ public class MouseInteractionController
     private readonly PlayerInventory inventory;
     private readonly MouseInput mouse;
     public System.Func<Vector2, bool> TryInteract { get; set; }
+    public System.Func<Vector2, bool> TryPrimaryInteract { get; set; }
 
     public MouseInteractionController(
         Camera2D camera,
@@ -36,8 +37,15 @@ public class MouseInteractionController
         bool blocksWorldInput)
     {
         // Game1 updates the shared mouse once, before UI and world input.
-        if (!mouse.RightClicked || blocksWorldInput)
+        if (blocksWorldInput)
             return;
+
+        if (mouse.LeftClicked)
+        {
+            TryPrimaryInteract?.Invoke(mouse.GetWorldPosition(camera, viewport));
+            return;
+        }
+        if (!mouse.RightClicked) return;
 
         Vector2 worldPosition = mouse.GetWorldPosition(camera, viewport);
         if (TryInteract?.Invoke(worldPosition) == true) return;

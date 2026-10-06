@@ -100,7 +100,7 @@ public class Player
                 _sprite.Texture = _animationManager.Texture;
                 _sprite.SourceRectangle = _animationManager.SourceRectangle;
             }
-            _sprite.Position = Position;
+            _sprite.Position = Position + (_animationManager?.DrawOffset ?? Vector2.Zero) * Scale;
             _sprite.Scale = Scale;
             _sprite.Draw(spriteBatch);
         }
@@ -200,8 +200,10 @@ public class Player
     }
 
     /// <summary>Missing action artwork falls back to the current facing's idle pose.</summary>
-    public bool PlayActionAnimation(string animationName)
+    public bool PlayActionAnimation(string animationName, float? durationSeconds = null)
     {
+        if (durationSeconds.HasValue && (!float.IsFinite(durationSeconds.Value) || durationSeconds <= 0))
+            throw new ArgumentOutOfRangeException(nameof(durationSeconds));
         _velocity = Vector2.Zero;
         if (_animationManager == null) return false;
         if (animationName == null || !_animations.TryGetValue(animationName, out Animation animation))
@@ -209,7 +211,9 @@ public class Player
             RestoreIdleAnimation();
             return false;
         }
-        _animationManager.Play(animation, restart: true);
+        float rate = durationSeconds.HasValue
+            ? animation.FrameCount * animation.FrameDuration / durationSeconds.Value : 1f;
+        _animationManager.Play(animation, restart: true, playbackRate: rate);
         return true;
     }
 

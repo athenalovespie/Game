@@ -6,6 +6,10 @@ public static class SampleItemCatalog
 	{
 		var definitions = new ItemDefinitionRegistry();
 		definitions.Register(new ItemDefinition(
+			First_game.Harvesting.HarvestCatalog.BasicAxeId, "Basic Axe",
+			"Select in the hotbar, then left-click a nearby tree.", "Images/Axe_Item",
+			ItemCategory.Tool, maxStackSize: 1, basePrice: 50));
+		definitions.Register(new ItemDefinition(
 			"(O)wood", "Wood", "A piece of building material.", "Images/wood",
 			ItemCategory.Resource, maxStackSize: 99, basePrice: 2,
 			spawnerRuleId: "wood_pile_drop"));

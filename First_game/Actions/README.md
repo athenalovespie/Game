@@ -59,10 +59,15 @@ completion. `PlayActionAnimation` restarts the requested animation explicitly; c
 on stage entry, not every frame. It returns false and uses idle when artwork is missing.
 Provide a timer fallback if a stage relies on completion and its artwork is optional.
 
-## Example: chopping, mining, or fighting
+## Chopping, mining, or fighting
 
-The following is an integration example: `tree`, its health, and tool checks are objects
-you supply. Existing trees are decorative `Sprite` objects, not damageable resource nodes.
+Tree chopping is implemented in [Harvesting](../Harvesting/README.md). Left-click
+uses `HarvestController` and `HarvestAction`; placed trees now have resource health,
+and depletion removes their sprites and collision. Tool settings drive swing timing
+and animation speed. Use that implementation for resource harvesting.
+
+`TimedEffectAction` remains a simpler helper for other fixed-target effects. The
+following pseudocode illustrates it with objects and methods supplied by a caller:
 
 ```csharp
 var chop = new TimedEffectAction(
@@ -87,11 +92,11 @@ the fixed target position in this helper.
 Tree/rock health, loot tables, destruction, removing collision cells, and respawn belong
 to the resource object/system. Award drops when health first crosses zero, not on every
 strike. Tool durability or stamina spending also belongs in the action/effect you define.
-The framework supports these mechanics; it does not invent enemies, NPCs, rocks, or
-damageable trees in the existing world.
+The harvesting module supplies tree health and removal. Enemies, NPCs, rocks and
+resource rewards still need their own content and integration.
 
-To support holding a button for repeated swings, request a NEW action after the prior
-one ends and while input is still held. Never reset the active swing each frame.
+Harvesting deliberately requires a fresh mouse press for each swing; holding does
+not repeat or queue actions. Never reset an active swing each frame.
 
 ## Example: talking
 
@@ -117,6 +122,9 @@ in `Game1.LoadContent` with a method that checks water, NPCs, resource nodes, et
 Return true when an interaction owns the click, including a rejected attempt on a
 recognized target. Return false to allow the existing pickup code to handle it.
 `Game1` suppresses ordinary interactions while an action or menu owns input.
+
+`MouseInteractionController.TryPrimaryInteract` receives fresh left-clicks and points
+at `harvesting.TryInteract`. Left-clicks never fall through to right-click pickups.
 
 ## Add your own fishing minigame
 

@@ -15,6 +15,9 @@ public class Animation
 
     public bool IsLooping { get; set; }
 
+    // Art alignment in unscaled pixels; does not move the gameplay body.
+    public Vector2 DrawOffset { get; set; }
+
     public Texture2D Texture { get; private set; }
 
     public Animation(Texture2D texture, int frameCount)

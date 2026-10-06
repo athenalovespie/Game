@@ -15,6 +15,7 @@ using MonoGameLibrary.Input;
 using First_game.Actions;
 using First_game.Fishing;
 using First_game.Doors;
+using First_game.Harvesting;
 using System.IO;
 using System.Diagnostics;
 
@@ -30,8 +31,8 @@ public class Game1 : Core
     private SpriteFont hudFont;
     private Camera2D camera;
     private readonly WorldRenderer worldRenderer = new WorldRenderer();
-    private readonly List<Sprite> trees = new List<Sprite>();
-    private readonly List<Sprite> pines = new List<Sprite>();
+    private ResourceWorld resources;
+    private HarvestController harvesting;
     private readonly Random random = new Random();
     private Sprite House;
     private Sprite Tent;
@@ -118,7 +119,9 @@ public class Game1 : Core
         ItemCategoryBehaviorRegistry itemBehaviors = SampleItemCatalog.CreateBehaviors();
         itemDefinitions.ResolveUseEffects(UseEffectRegistry.CreateBuiltIns(), itemBehaviors);
         inventory = new PlayerInventory(itemDefinitions, itemBehaviors, PlayerInventory.PlayerCapacity);
+        inventory.AddItem(HarvestCatalog.BasicAxeId);
         hotbar = new Hotbar(inventory);
+        resources = new ResourceWorld(worldGrid);
         var spawnRules = new WorldSpawnRuleRegistry(itemDefinitions);
         WorldSpawnCatalog.RegisterRules(spawnRules);
         pickupSystem = new WorldPickupSystem(
@@ -146,6 +149,11 @@ public class Game1 : Core
 
         var animations = new Dictionary<string, Animation>
         {
+            // These filenames face opposite to their labels. Offsets align the wider sheets.
+            { "ChopRight", new Animation(Content.Load<Texture2D>("Images/Left_Axe"), 4)
+                { IsLooping = false, DrawOffset = new Vector2(155, -1.5f) } },
+            { "ChopLeft", new Animation(Content.Load<Texture2D>("Images/Right_Axe"), 4)
+                { IsLooping = false, DrawOffset = new Vector2(-155, -1.5f) } },
             { "WalkRight", new Animation(walkTextureRight, 9)  },
             { "WalkLeft",  new Animation(walkTextureLeft, 9)  },
             { "WalkDown",  new Animation(walkTextureRight, 9)  },
@@ -251,7 +259,7 @@ public class Game1 : Core
                 groundOffsetY: TreeTexture.Height / 2f - 100f,
                 groundOffsetX: -447.5f))
             {
-                trees.Add(tree);
+                resources.Register(tree, worldGrid.WorldToCell(TreePosition), HarvestCatalog.Tree);
             }
         }
 
@@ -271,7 +279,7 @@ public class Game1 : Core
                 groundOffsetY: PineTexture.Height / 2f -100f,
                 groundOffsetX: -60f))
             {
-                pines.Add(pine);
+                resources.Register(pine, worldGrid.WorldToCell(PinePosition), HarvestCatalog.Pine);
             }
         }
         camera = new Camera2D(cat.Position);
@@ -280,6 +288,8 @@ public class Game1 : Core
         fishing.Register(new FishingSpot(worldGrid, Lake.GetOccupiedCells(), "(O)fish", new FishingSettings()));
         fishingOverlay = new FishingOverlay(gridPixel);
         mouseInteractions.TryInteract = fishing.TryInteract;
+        harvesting = new HarvestController(cat, hotbar, resources, HarvestCatalog.Tools);
+        mouseInteractions.TryPrimaryInteract = harvesting.TryInteract;
 
         background = new Sprite(mapTexture);
         background.Scale = 2.0f;
@@ -340,7 +350,7 @@ public class Game1 : Core
             mouseInteractions.Update(worldTime, GraphicsDevice.Viewport, cat.GroundPosition,
                 blocked || doors.IsTransitioning || mouseOverHotbar || cat.Actions.IsBusy);
 
-        // A right-click may have started an action after the door update.
+        // A world click may have started an action after the door update.
         doors.SetInteractionEnabled(!blocked && !doors.IsTransitioning && !cat.Actions.IsBusy);
         if (!uiManager.PausesWorld && !wasTransitioning && !doors.IsTransitioning)
         {
@@ -395,10 +405,7 @@ public class Game1 : Core
             Lake?.Sprite.Draw(SpriteBatch);
             worldRenderer.Submit(House.SortY, House.Draw);
             worldRenderer.Submit(Tent.SortY, Tent.Draw);
-            foreach (Sprite tree in trees)
-                worldRenderer.Submit(tree.SortY, tree.Draw);
-            foreach (Sprite pine in pines)
-                worldRenderer.Submit(pine.SortY, pine.Draw);
+            resources.SubmitDraw(worldRenderer);
             pickupSystem.SubmitDraw(worldRenderer);
             worldRenderer.Submit(cat.Bounds.Bottom, cat.Draw);
             worldRenderer.Draw(SpriteBatch);
