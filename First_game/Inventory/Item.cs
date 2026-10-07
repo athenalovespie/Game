@@ -30,7 +30,8 @@ public sealed class ItemDefinition
 		float effectAmount = 0f,
 		float effectSecondaryAmount = 0f,
 		float effectDurationSeconds = 0f,
-		string effectTargetId = null)
+		string effectTargetId = null,
+		First_game.Placement.PlaceableData placeable = null)
 	{
 		if (string.IsNullOrWhiteSpace(qualifiedId)
 			|| qualifiedId[0] != '('
@@ -44,6 +45,7 @@ public sealed class ItemDefinition
 		if (basePrice < 0)
 			throw new ArgumentOutOfRangeException(nameof(basePrice));
 
+		Placeable = placeable;
 		QualifiedId = qualifiedId;
 		Name = name;
 		Description = description ?? string.Empty;
@@ -61,6 +63,7 @@ public sealed class ItemDefinition
 		EffectTargetId = string.IsNullOrWhiteSpace(effectTargetId) ? null : effectTargetId;
 	}
 
+	public First_game.Placement.PlaceableData Placeable { get; }
 	public string QualifiedId { get; }
 	public string Name { get; }
 	public string Description { get; }

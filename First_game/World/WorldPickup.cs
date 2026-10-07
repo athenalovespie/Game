@@ -47,7 +47,7 @@ public sealed class WorldPickup
 			_sprite = new Sprite(icon);
 		else
 			_sprite.Texture = icon;
-		_sprite.Scale = 0.2f;
+		_sprite.Scale = definition.Placeable == null ? 0.2f : 80f / Math.Max(icon.Width, icon.Height);
 		_sprite.Position = position;
 	}
 

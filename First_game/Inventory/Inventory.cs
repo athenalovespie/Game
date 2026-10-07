@@ -28,6 +28,32 @@ public sealed class Inventory
 	}
 
 	public int Capacity => _slots.Length;
+	public event Action Changed;
+	public ItemDefinition GetDefinition(string id) => _definitions.GetRequired(id);
+
+	// Exact-instance consumption prevents a stale preview from spending a replacement stack.
+	public bool TryConsumeSlot(int slotIndex, ItemInstance expected)
+	{
+		ValidateSlotIndex(slotIndex);
+		if (expected == null || !ReferenceEquals(_slots[slotIndex], expected) || expected.Count < 1)
+			return false;
+		if (--expected.Count == 0) _slots[slotIndex] = null;
+		Changed?.Invoke();
+		return true;
+	}
+
+	public void RestoreFromJson(string json)
+	{
+		Inventory restored = LoadFromJson(json, _definitions, _behaviors);
+		_slots = restored._slots;
+		Changed?.Invoke();
+	}
+
+	private void NotifyTransfer(Inventory destination)
+	{
+		Changed?.Invoke();
+		if (!ReferenceEquals(this, destination)) destination.Changed?.Invoke();
+	}
 
 	// Adds as many items as fit and returns the number accepted.
 	public int AddItem(string qualifiedId, int count = 1, int quality = 0, int? durability = null)
@@ -43,7 +69,7 @@ public sealed class Inventory
 		for (int slotIndex = 0; slotIndex < _slots.Length && remaining > 0; slotIndex++)
 		{
 			ItemInstance slot = _slots[slotIndex];
-			if (slot == null || !behavior.CanStack(definition, slot, incoming))
+			if (slot == null || !CanStack(definition, behavior, slot, incoming))
 				continue;
 
 			int added = Math.Min(remaining, stackLimit - slot.Count);
@@ -61,6 +87,7 @@ public sealed class Inventory
 			remaining -= added;
 		}
 
+		if (count != remaining) Changed?.Invoke();
 		return count - remaining;
 	}
 
@@ -86,6 +113,7 @@ public sealed class Inventory
 				_slots[slotIndex] = null;
 		}
 
+		if (count != remaining) Changed?.Invoke();
 		return count - remaining;
 	}
 
@@ -107,6 +135,7 @@ public sealed class Inventory
 		{
 			destinationInventory._slots[destinationIndex] = source;
 			_slots[sourceIndex] = null;
+			NotifyTransfer(destinationInventory);
 			return true;
 		}
 
@@ -117,12 +146,14 @@ public sealed class Inventory
 			source.Count -= moved;
 			if (source.Count == 0)
 				_slots[sourceIndex] = null;
+			NotifyTransfer(destinationInventory);
 			return true;
 		}
 
 		// Preserve the existing full-stack swap rule, including a compatible full destination.
 		_slots[sourceIndex] = destination;
 		destinationInventory._slots[destinationIndex] = source;
+		NotifyTransfer(destinationInventory);
 		return true;
 	}
 
@@ -146,6 +177,7 @@ public sealed class Inventory
 			destinationInventory._slots[destinationIndex] = new ItemInstance(
 				source.QualifiedId, count, source.Quality, source.Durability);
 			source.Count -= count;
+			NotifyTransfer(destinationInventory);
 			return true;
 		}
 
@@ -155,6 +187,7 @@ public sealed class Inventory
 
 		destination.Count += moved;
 		source.Count -= moved;
+		NotifyTransfer(destinationInventory);
 		return true;
 	}
 
@@ -163,7 +196,7 @@ public sealed class Inventory
 	{
 		ItemDefinition definition = _definitions.GetRequired(source.QualifiedId);
 		IItemCategoryBehavior behavior = _behaviors.GetRequired(definition.Category);
-		if (!behavior.CanStack(definition, destination,
+		if (!CanStack(definition, behavior, destination,
 			new ItemStackKey(source.QualifiedId, source.Quality, source.Durability)))
 			return 0;
 		return Math.Min(count, Math.Max(0, GetStackLimit(definition, behavior) - destination.Count));
@@ -225,6 +258,7 @@ public sealed class Inventory
 			return false;
 
 		Array.Resize(ref _slots, _slots.Length + slotsToAdd);
+		Changed?.Invoke();
 		return true;
 	}
 
@@ -236,7 +270,7 @@ public sealed class Inventory
 			return false;
 
 		ItemDefinition definition = _definitions.GetRequired(instance.QualifiedId);
-		if (!definition.IsUsable || definition.ResolvedUseEffect == null)
+		if (definition.Placeable != null || !definition.IsUsable || definition.ResolvedUseEffect == null)
 			return false;
 
 		ItemUseOutcome outcome = definition.ResolvedUseEffect.Execute(definition, instance, context);
@@ -246,6 +280,7 @@ public sealed class Inventory
 			if (instance.Count == 0)
 				_slots[slotIndex] = null;
 		}
+		if (outcome != ItemUseOutcome.Failed) Changed?.Invoke();
 		return outcome != ItemUseOutcome.Failed;
 	}
 
@@ -302,15 +337,20 @@ public sealed class Inventory
 		{
 			if (slot == null)
 				available += stackLimit;
-			else if (behavior.CanStack(definition, slot, incoming))
+			else if (CanStack(definition, behavior, slot, incoming))
 				available += Math.Max(0, stackLimit - slot.Count);
 		}
 		return available;
 	}
 
+	private static bool CanStack(ItemDefinition definition, IItemCategoryBehavior behavior,
+		ItemInstance slot, ItemStackKey incoming) => definition.Placeable != null
+		? slot.QualifiedId == incoming.QualifiedId && slot.Quality == incoming.Quality && slot.Durability == incoming.Durability
+		: behavior.CanStack(definition, slot, incoming);
+
 	private static int GetStackLimit(ItemDefinition definition, IItemCategoryBehavior behavior)
 	{
-		int stackLimit = behavior.GetMaxStackSize(definition);
+		int stackLimit = definition.Placeable != null ? definition.MaxStackSize : behavior.GetMaxStackSize(definition);
 		if (stackLimit < 1 || stackLimit > definition.MaxStackSize)
 			throw new InvalidOperationException($"The category returned an invalid stack limit for '{definition.QualifiedId}'.");
 		return stackLimit;

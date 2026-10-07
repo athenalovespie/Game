@@ -37,6 +37,12 @@ public sealed class ResourceNode
         Health = definition.MaxHealth;
     }
 
+    internal void RestoreHealth(int health)
+    {
+        if (health < 1 || health > Definition.MaxHealth) throw new ArgumentOutOfRangeException(nameof(health));
+        Health = health;
+    }
+
     public bool Accepts(ToolDefinition tool) => !IsDepleted
         && tool != null && tool.Kind == Definition.RequiredToolKind;
 

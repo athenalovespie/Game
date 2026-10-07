@@ -10,6 +10,7 @@ public class MouseInput
     private MouseState previousState;
     private MouseState currentState;
 
+    public int ScrollDelta => currentState.ScrollWheelValue - previousState.ScrollWheelValue;
     public Point ScreenPosition => currentState.Position;
     public bool LeftClicked => currentState.LeftButton == ButtonState.Pressed
         && previousState.LeftButton == ButtonState.Released;

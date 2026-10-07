@@ -18,6 +18,7 @@ using First_game.Doors;
 using First_game.Harvesting;
 using System.IO;
 using System.Diagnostics;
+using First_game.Placement;
 
 namespace First_game;
 
@@ -33,9 +34,17 @@ public class Game1 : Core
     private readonly WorldRenderer worldRenderer = new WorldRenderer();
     private ResourceWorld resources;
     private HarvestController harvesting;
-    private readonly Random random = new Random();
+    private readonly Random random = new Random(173); // Stable exterior layout for save restoration.
     private Sprite House;
-    private Sprite Tent;
+    private PlacementWorld placementWorld;
+    private PlacementController placement;
+    private PlacementRenderer placementRenderer;
+    private ItemDefinitionRegistry itemDefinitions;
+    private ItemCategoryBehaviorRegistry itemBehaviors;
+    private static readonly string WorldSavePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OurGame", "world.json");
+    private string saveStatus;
+    private double saveStatusUntil;
     private PlacedObject Lake;
     private MouseInteractionController mouseInteractions;
     private KeyboardState _previousKeyboard;
@@ -115,8 +124,8 @@ public class Game1 : Core
         itemTextureLoader = assetName => Content.Load<Texture2D>(assetName);
         var catTexture = Content.Load<Texture2D>("Images/startercat");
         var mapTexture = Content.Load<Texture2D>("Images/grass");
-        ItemDefinitionRegistry itemDefinitions = SampleItemCatalog.CreateDefinitions();
-        ItemCategoryBehaviorRegistry itemBehaviors = SampleItemCatalog.CreateBehaviors();
+        itemDefinitions = SampleItemCatalog.CreateDefinitions();
+        itemBehaviors = SampleItemCatalog.CreateBehaviors();
         itemDefinitions.ResolveUseEffects(UseEffectRegistry.CreateBuiltIns(), itemBehaviors);
         inventory = new PlayerInventory(itemDefinitions, itemBehaviors, PlayerInventory.PlayerCapacity);
         inventory.AddItem(HarvestCatalog.BasicAxeId);
@@ -134,7 +143,6 @@ public class Game1 : Core
         var HouseTexture = Content.Load<Texture2D>("Images/House");
         var TreeTexture = Content.Load<Texture2D>("Images/Tree");
         var PineTexture = Content.Load<Texture2D>("Images/Pine");
-        var TentTexture = Content.Load<Texture2D>("Images/Tent");
         var LakeTexture = Content.Load<Texture2D>("Images/Lake");
         var inventoryBackground = Content.Load<Texture2D>("Images/Inventory");
         var hotbarBackground = Content.Load<Texture2D>("Images/Hudbar");
@@ -221,19 +229,11 @@ public class Game1 : Core
                 "The house footprint is occupied or outside the grid.");
 
         }
-        if (!gridPlacer.TryPlaceBuilding(
-            TentTexture,
-            new Vector2(-500, 2000),
-            widthInCells: 5,
-            heightInCells: 3,
-            scale: 0.15f,
-            out Tent,
-            groundOffsetY: TentTexture.Height / 2f - 667f,
-            groundOffsetX: -200f))
-            {
-            throw new InvalidOperationException(
-                "The house footprint is occupied or outside the grid.");
-
+        foreach (Point cell in Lake.GetOccupiedCells()) worldGrid.GetCell(cell).Ground = GroundType.Water;
+        for (int y = 0; y < worldGrid.Rows; y++) for (int x = 0; x < worldGrid.Columns; x++)
+        {
+            GridCell cell = worldGrid.GetCell(new Point(x, y));
+            if (ReferenceEquals(cell.Occupant, House)) cell.Ground = GroundType.Wall;
         }
         doors = DoorConfiguration.Preload(
             Path.Combine(AppContext.BaseDirectory, "Content", "doors.json"),
@@ -287,9 +287,13 @@ public class Game1 : Core
         fishing = new FishingController(cat, inventory);
         fishing.Register(new FishingSpot(worldGrid, Lake.GetOccupiedCells(), "(O)fish", new FishingSettings()));
         fishingOverlay = new FishingOverlay(gridPixel);
-        mouseInteractions.TryInteract = fishing.TryInteract;
+        placementWorld = new PlacementWorld(worldGrid, itemDefinitions);
+        placement = new PlacementController(placementWorld, hotbar, inventory);
+        placementRenderer = new PlacementRenderer(placementWorld, itemDefinitions, itemTextureLoader, gridPixel);
+        uiManager.TryCancelWorldMode = () => { if (!placement.IsActive) return false; placement.Cancel(); return true; };
+        mouseInteractions.TryInteract = point => placementWorld.TryPickUp(worldGrid.WorldToCell(point), inventory) || fishing.TryInteract(point);
         harvesting = new HarvestController(cat, hotbar, resources, HarvestCatalog.Tools);
-        mouseInteractions.TryPrimaryInteract = harvesting.TryInteract;
+        mouseInteractions.TryPrimaryInteract = point => placement.TryPrimaryInteract(point) || harvesting.TryInteract(point);
 
         background = new Sprite(mapTexture);
         background.Scale = 2.0f;
@@ -346,20 +350,58 @@ public class Game1 : Core
         doors.SetInteractionEnabled(!blocked && !cat.Actions.IsBusy);
         doors.Update((float)gameTime.ElapsedGameTime.TotalSeconds, uiInput);
 
-        if (doors.ActiveArea.IsExterior)
-            mouseInteractions.Update(worldTime, GraphicsDevice.Viewport, cat.GroundPosition,
-                blocked || doors.IsTransitioning || mouseOverHotbar || cat.Actions.IsBusy);
-
-        // A world click may have started an action after the door update.
-        doors.SetInteractionEnabled(!blocked && !doors.IsTransitioning && !cat.Actions.IsBusy);
         if (!uiManager.PausesWorld && !wasTransitioning && !doors.IsTransitioning)
         {
             camera.UpdateTarget(cat.Position);
             camera.Update(gameTime);
         }
 
+        bool placementBlocked = blocked || doors.IsTransitioning || mouseOverHotbar || cat.Actions.IsBusy || !doors.ActiveArea.IsExterior;
+        placementWorld.PlayerGround = cat.GroundPosition;
+        placementWorld.PlayerBounds = cat.Bounds;
+        if (!placementBlocked && uiInput.Pressed(Keys.R)) placement.Rotate();
+        placement.Update(mouseInput.GetWorldPosition(camera, GraphicsDevice.Viewport), placementBlocked);
+        if (!placementBlocked && (uiInput.Pressed(Keys.F5) || uiInput.Pressed(Keys.F9)))
+        {
+            HandleWorldSave(uiInput.Pressed(Keys.F5), gameTime.TotalGameTime.TotalSeconds);
+            placement.Update(mouseInput.GetWorldPosition(camera, GraphicsDevice.Viewport), blocked: true);
+            placementBlocked = true;
+        }
+        if (doors.ActiveArea.IsExterior)
+            mouseInteractions.Update(worldTime, GraphicsDevice.Viewport, cat.GroundPosition,
+                placementBlocked);
+        // Pickup or inventory events may change the footprint during this same input frame.
+        placement.Update(mouseInput.GetWorldPosition(camera, GraphicsDevice.Viewport), placementBlocked);
+
+        // A world click may have started an action after the door update.
+        doors.SetInteractionEnabled(!blocked && !doors.IsTransitioning && !cat.Actions.IsBusy);
+
         _previousKeyboard = currentKeyboard;
         base.Update(gameTime);
+    }
+
+    private void HandleWorldSave(bool save, double now)
+    {
+        try
+        {
+            if (save)
+                WorldSaveStore.Write(WorldSavePath, WorldSaveStore.Capture(inventory, placementWorld, pickupSystem, resources, cat.Position, worldElapsed));
+            else
+            {
+                var snapshot = WorldSaveStore.Read(WorldSavePath);
+                WorldSaveStore.Restore(snapshot, inventory, itemDefinitions, itemBehaviors, placementWorld, pickupSystem, resources);
+                cat.Position = new Vector2(snapshot.PlayerX, snapshot.PlayerY);
+                worldElapsed = TimeSpan.FromSeconds(snapshot.ElapsedSeconds);
+                placement.Cancel(); OnAreaChanged();
+            }
+            saveStatus = save ? "World saved (F9 to load)" : "World loaded";
+        }
+        catch (Exception error)
+        {
+            saveStatus = save ? "Save failed; see debug log" : "Load failed; current world preserved";
+            Trace.TraceError(error.ToString());
+        }
+        saveStatusUntil = now + 4;
     }
 
     private void OnAreaChanged()
@@ -382,6 +424,9 @@ public class Game1 : Core
             doors.AreaChanged -= OnAreaChanged;
             doors.Dispose();
         }
+        placementRenderer?.Dispose();
+        placement?.Dispose();
+        hotbar?.Dispose();
         gridPixel?.Dispose();
         base.UnloadContent();
     }
@@ -404,13 +449,14 @@ public class Game1 : Core
             background.Draw(SpriteBatch);
             Lake?.Sprite.Draw(SpriteBatch);
             worldRenderer.Submit(House.SortY, House.Draw);
-            worldRenderer.Submit(Tent.SortY, Tent.Draw);
+            placementRenderer.SubmitDraw(worldRenderer);
             resources.SubmitDraw(worldRenderer);
             pickupSystem.SubmitDraw(worldRenderer);
             worldRenderer.Submit(cat.Bounds.Bottom, cat.Draw);
             worldRenderer.Draw(SpriteBatch);
             fishingOverlay.DrawWorld(SpriteBatch, cat, fishing.Active);
             DrawGrid();
+            placementRenderer.DrawPreview(SpriteBatch, placement);
         }
         else
         {
@@ -423,6 +469,8 @@ public class Game1 : Core
         hotbarPanel.Draw(SpriteBatch, GraphicsDevice.Viewport);
         uiManager.Draw(SpriteBatch, GraphicsDevice.Viewport);
         doorOverlay.Draw(SpriteBatch, GraphicsDevice.Viewport);
+        if (saveStatus != null && gameTime.TotalGameTime.TotalSeconds < saveStatusUntil)
+            SpriteBatch.DrawString(hudFont, saveStatus, new Vector2(20, 20), Color.White);
         SpriteBatch.End();
         base.Draw(gameTime);
     }

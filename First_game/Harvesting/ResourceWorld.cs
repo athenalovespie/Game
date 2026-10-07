@@ -14,6 +14,7 @@ public sealed class ResourceWorld
     private sealed record Placement(ResourceNode Node, Sprite Sprite, Point Cell);
     private readonly WorldGrid grid;
     private readonly List<Placement> placements = new();
+    private readonly Dictionary<Point, Placement> initial = new();
     private readonly Dictionary<Texture2D, BitArray> opaquePixels = new();
     public int Count => placements.Count;
     public event Action<ResourceNode> Depleted;
@@ -30,7 +31,9 @@ public sealed class ResourceWorld
             throw new InvalidOperationException("Resource cell already registered.");
         Vector2 ground = grid.CellToWorld(cell) + new Vector2(grid.CellSize / 2f, grid.CellSize);
         var node = new ResourceNode(definition, ground);
-        placements.Add(new Placement(node, sprite, cell));
+        var placement = new Placement(node, sprite, cell);
+        placements.Add(placement);
+        initial.TryAdd(cell, placement);
         node.Depleted += OnDepleted;
         return node;
     }
@@ -91,8 +94,41 @@ public sealed class ResourceWorld
         return true;
     }
 
+    public ResourceSaveEntry[] Capture()
+    {
+        var result = new ResourceSaveEntry[placements.Count];
+        for (int i = 0; i < result.Length; i++) result[i] = new ResourceSaveEntry {
+            X = placements[i].Cell.X, Y = placements[i].Cell.Y, Health = placements[i].Node.Health };
+        return result;
+    }
+    public void Restore(ResourceSaveEntry[] entries)
+    {
+        if (entries == null) throw new InvalidOperationException("Invalid resource snapshot.");
+        var seen = new HashSet<Point>();
+        foreach (var entry in entries)
+        {
+            if (entry == null || !initial.TryGetValue(new Point(entry.X, entry.Y), out var original)
+                || !seen.Add(original.Cell) || entry.Health < 1 || entry.Health > original.Node.Definition.MaxHealth)
+                throw new InvalidOperationException("Invalid saved resource.");
+        }
+        while (placements.Count > 0) Remove(placements[placements.Count - 1].Node);
+        foreach (var entry in entries)
+        {
+            var original = initial[new Point(entry.X, entry.Y)];
+            if (!grid.Occupy(original.Cell, CellType.Plant, original.Sprite)) throw new InvalidOperationException("Saved resource is blocked.");
+            Register(original.Sprite, original.Cell, original.Node.Definition).RestoreHealth(entry.Health);
+        }
+    }
+
     private void OnDepleted(ResourceNode node)
     {
         if (Remove(node)) Depleted?.Invoke(node);
     }
+}
+
+public sealed class ResourceSaveEntry
+{
+    public int X { get; set; }
+    public int Y { get; set; }
+    public int Health { get; set; }
 }

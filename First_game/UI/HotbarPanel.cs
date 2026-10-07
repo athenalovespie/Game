@@ -28,6 +28,8 @@ public sealed class HotbarPanel
     // Returns true over the HUD so right-clicks cannot collect objects behind it.
     public bool Update(UIInput input, Viewport viewport)
     {
+        if (input.Mouse.ScrollDelta != 0)
+            hotbar.SelectSlot((hotbar.SelectedSlot - System.Math.Sign(input.Mouse.ScrollDelta) + Hotbar.SlotCount) % Hotbar.SlotCount);
         int pressedSlot = HotbarInput.GetPressedSlot(input);
         if (pressedSlot >= 0)
             hotbar.SelectSlot(pressedSlot);

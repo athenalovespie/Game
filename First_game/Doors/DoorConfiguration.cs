@@ -116,7 +116,9 @@ public sealed class DoorConfiguration
             for (int y = first.Y; y <= last.Y; y++)
             {
                 var cell = new Point(x, y);
-                if (grid.IsValidCell(cell) && grid.CanPlace(cell))
+                if (!grid.IsValidCell(cell)) continue;
+                grid.GetCell(cell).PlacementForbidden = true;
+                if (grid.CanPlace(cell))
                     grid.Occupy(cell, CellType.Building, blocksMovement: false);
             }
     }

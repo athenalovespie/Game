@@ -18,6 +18,7 @@ public sealed class UIManager
     public bool PausesWorld => ActiveMenu == MenuType.Pause;
     public bool ExitRequested { get; private set; }
     public bool ConsumedInputThisFrame { get; private set; }
+    public Func<bool> TryCancelWorldMode { get; set; }
 
     public UIManager(Texture2D pixel, InputBindings bindings = null)
     {
@@ -63,10 +64,12 @@ public sealed class UIManager
 
         if (input.Pressed(Keys.Escape))
         {
+            bool cancelledMode = TryCancelWorldMode?.Invoke() == true;
             if (BlocksWorldInput)
                 Close();
-            else
-                ExitRequested = true; // Preserve Escape-to-exit in the world.
+            else if (!cancelledMode)
+                ExitRequested = true; // Preserve Escape-to-exit when no placement is active.
+            ConsumedInputThisFrame = true;
         }
         else if (input.Pressed(Keys.P))
             Toggle(MenuType.Pause);

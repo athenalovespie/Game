@@ -3,6 +3,8 @@ using System;
 
 namespace First_game.World;
 
+public enum GroundType { Grass, Dirt, Sand, Water, Wall }
+
 public enum CellType
 {
     Empty,
@@ -13,22 +15,24 @@ public enum CellType
 
 public class GridCell
 {
-    public CellType Type { get; set; }
+    private readonly Action changed;
+    private CellType type;
+    private object occupant;
+    private bool blocksMovement;
+    private int placementCount;
+    private GroundType ground;
+    private bool placementForbidden;
+    public GridCell(Action changed = null) { this.changed = changed; }
+    public CellType Type { get => type; set { if (type == value) return; type = value; changed?.Invoke(); } }
+    public object Occupant { get => occupant; set { if (ReferenceEquals(occupant, value)) return; occupant = value; changed?.Invoke(); } }
+    public bool BlocksMovement { get => blocksMovement || placementCount > 0 || ground == GroundType.Water || ground == GroundType.Wall;
+        set { if (blocksMovement == value) return; blocksMovement = value; changed?.Invoke(); } }
+    public GroundType Ground { get => ground; set { if (ground == value) return; ground = value; changed?.Invoke(); } }
+    public bool PlacementForbidden { get => placementForbidden; set { if (placementForbidden == value) return; placementForbidden = value; changed?.Invoke(); } }
+    internal bool StaticBlocksMovement => blocksMovement;
+    internal int PlacementCount { get => placementCount; set { placementCount = value; changed?.Invoke(); } }
+    public bool IsOccupied() => type != CellType.Empty || placementCount > 0;
 
-    public object Occupant { get; set; }
-
-    public bool BlocksMovement { get; set; }
-
-    public GridCell()
-    {
-        Type = CellType.Empty;
-        Occupant = null;
-    }
-
-    public bool IsOccupied()
-    {
-        return Type != CellType.Empty;
-    }
 }
 
 public class WorldGrid
@@ -41,6 +45,8 @@ public class WorldGrid
 
     public int Rows { get; private set; }
 
+    public long Revision { get; private set; }
+    private void MarkChanged() => Revision++;
     private GridCell[,] cells;
 
     public WorldGrid(
@@ -84,7 +90,7 @@ public class WorldGrid
         {
             for (int row = 0; row < Rows; row++)
             {
-                cells[column, row] = new GridCell();
+                cells[column, row] = new GridCell(MarkChanged);
             }
         }
     }

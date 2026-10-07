@@ -100,6 +100,68 @@ public sealed class WorldPickupSystem
 		}
 	}
 
+    public PickupSnapshot Capture()
+    {
+        var snapshot = new PickupSnapshot();
+        foreach (var pickup in _activePickups)
+            snapshot.Active.Add(new PickupSaveEntry { RuleId = pickup.SpawnRule.RuleId,
+                NodeX = pickup.SourceNode.Position.X, NodeY = pickup.SourceNode.Position.Y,
+                TileX = pickup.Cell.X, TileY = pickup.Cell.Y, Count = pickup.Item.Count });
+        foreach (var pending in _respawns.UnorderedItems)
+            snapshot.Pending.Add(new PickupSaveEntry { RuleId = pending.Element.Rule.RuleId,
+                NodeX = pending.Element.Node.Position.X, NodeY = pending.Element.Node.Position.Y, Due = pending.Priority });
+        return snapshot;
+    }
+
+    public void Clear()
+    {
+        foreach (var pickup in _activePickups)
+        {
+            if (ReferenceEquals(_grid.GetCell(pickup.Cell).Occupant, pickup)) _grid.ClearCell(pickup.Cell);
+            _pickupPool.Push(pickup);
+        }
+        _activePickups.Clear(); _respawns.Clear();
+    }
+
+    public void Restore(PickupSnapshot snapshot)
+    {
+        if (snapshot?.Active == null || snapshot.Pending == null) throw new InvalidOperationException("Invalid pickup snapshot.");
+        var occupied = new HashSet<Point>();
+        foreach (var entry in snapshot.Active)
+        {
+            ValidateEntry(entry);
+            var rule = _rules.GetRequired(entry.RuleId);
+            Point tile = new(entry.TileX, entry.TileY);
+            if (entry.Count < 1 || entry.Count > _items.GetRequired(rule.QualifiedItemId).MaxStackSize
+                || !_grid.IsValidCell(tile) || !occupied.Add(tile)
+                || (_grid.IsOccupied(tile) && !(_grid.GetCell(tile).Occupant is WorldPickup)))
+                throw new InvalidOperationException("Invalid saved pickup location or count.");
+        }
+        foreach (var entry in snapshot.Pending) ValidateEntry(entry);
+        Clear();
+        foreach (var entry in snapshot.Active)
+        {
+            var rule = _rules.GetRequired(entry.RuleId);
+            var definition = _items.GetRequired(rule.QualifiedItemId);
+            Point tile = new(entry.TileX, entry.TileY);
+            var pickup = _pickupPool.Count == 0 ? new WorldPickup() : _pickupPool.Pop();
+            pickup.Reset(definition, GetIcon(definition), entry.Count, _grid.CellCenter(tile), tile,
+                new WorldSpawnNode(rule.NodeType, new Vector2(entry.NodeX, entry.NodeY)), rule);
+            _grid.Occupy(tile, CellType.Pickup, pickup, false); _activePickups.Add(pickup);
+        }
+        foreach (var entry in snapshot.Pending)
+        {
+            var rule = _rules.GetRequired(entry.RuleId);
+            _respawns.Enqueue(new RespawnRequest(new WorldSpawnNode(rule.NodeType, new Vector2(entry.NodeX, entry.NodeY)), rule), entry.Due);
+        }
+    }
+    private void ValidateEntry(PickupSaveEntry entry)
+    {
+        if (entry == null || entry.RuleId == null || !float.IsFinite(entry.NodeX) || !float.IsFinite(entry.NodeY)
+            || !double.IsFinite(entry.Due) || entry.Due < 0) throw new InvalidOperationException("Invalid pickup snapshot entry.");
+        _rules.GetRequired(entry.RuleId);
+    }
+
 	private void SpawnNode(WorldSpawnNode node)
 	{
 		IReadOnlyList<WorldSpawnRule> rules = _rules.GetForNode(node.NodeType);
@@ -118,7 +180,7 @@ public sealed class WorldPickupSystem
 		Point origin = _grid.WorldToCell(node.Position);
 		for (int attempt = 0; attempt < PlacementAttempts; attempt++)
 		{
-			Point cell = new Point(
+			Point cell = attempt == 0 ? origin : new Point(
 				origin.X + _random.Next(-PlacementRadius, PlacementRadius + 1),
 				origin.Y + _random.Next(-PlacementRadius, PlacementRadius + 1));
 			if (!_grid.CanPlace(cell))
