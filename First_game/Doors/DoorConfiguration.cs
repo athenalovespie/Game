@@ -96,7 +96,7 @@ public sealed class DoorConfiguration
 
             player.Input.Interact = config.InteractionKey;
             player.Input.Inventory = config.InventoryKey;
-            // Rooms use the already-loaded pixel texture. Build them once at startup:
+            // Fixed house rooms use the already-loaded pixel texture. Build them once at startup:
             // no ContentManager or GPU work, disk I/O, or allocations during a fade.
             return new DoorSystem(player, residents, exterior, config.FadeSeconds, logError);
         }

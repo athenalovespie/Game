@@ -1,0 +1,10 @@
+[
+  {
+    "id": "tent_small",
+    "widthTiles": 6,
+    "heightTiles": 5,
+    "tileSize": 100,
+    "wallThickness": 16,
+    "exitTile": [3, 4]
+  }
+]

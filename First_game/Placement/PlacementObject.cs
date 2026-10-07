@@ -7,10 +7,12 @@ namespace First_game.Placement;
 
 public sealed class PlacementObject
 {
-    internal PlacementObject(ItemDefinition definition, Point origin, int rotation, int quality, int? durability)
+    internal PlacementObject(ItemDefinition definition, Point origin, int rotation, int quality, int? durability, string instanceId = null)
     {
+        InstanceId = instanceId ?? Guid.NewGuid().ToString("N");
         Definition = definition; OriginTile = origin; Rotation = rotation; Quality = quality; Durability = durability;
     }
+    public string InstanceId { get; }
     public ItemDefinition Definition { get; }
     public Point OriginTile { get; }
     public int Rotation { get; }

@@ -11,6 +11,7 @@ namespace First_game.Placement;
 
 public sealed class PlacementSaveEntry
 {
+    public string InstanceId { get; set; }
     public string QualifiedItemId { get; set; }
     public int TileX { get; set; }
     public int TileY { get; set; }
@@ -46,6 +47,10 @@ public sealed class PlacementWorld
     public Rectangle PlayerBounds { get; set; }
     public event Action<PlacementObject> Added;
     public event Action PlacementRejected;
+    public event Action<PlacementObject> Removed;
+    public event Action Restored;
+    public Func<PlacementObject, bool> CanPickUp { get; set; }
+
 
     // Both preview and commit use this exact entry point; commit never trusts a cached green ghost.
     public bool IsPlacementValid(ItemDefinition definition, Point originTile, int rotation) =>
@@ -68,6 +73,13 @@ public sealed class PlacementWorld
             Vector2 topLeft = Grid.CellToWorld(tile);
             if (Vector2.DistanceSquared(Grid.CellCenter(tile), PlayerGround) > range * range
                 || PlayerBounds.Intersects(new Rectangle((int)topLeft.X, (int)topLeft.Y, Grid.CellSize, Grid.CellSize))) return false;
+        }
+        if (checkPlayer && data.Enterable != null)
+        {
+            Point outside = data.Enterable.OutsideTile(data, origin, rotation);
+            if (!Grid.IsValidCell(outside) || Grid.IsOccupied(outside) || Grid.GetCell(outside).BlocksMovement) return false;
+            Vector2 ground = data.Enterable.ReturnGround(Grid, data, origin, rotation, PlayerBounds);
+            if (!First_game.Interiors.ReturnPosition.IsFree(Grid, ground, PlayerBounds)) return false;
         }
         return true;
     }
@@ -111,7 +123,7 @@ public sealed class PlacementWorld
         PlacementObject obj = Occupancy.At(tile);
         if (obj == null) return false;
         float range = obj.Definition.Placeable.MaxRangeTiles * Grid.CellSize;
-        if (committing || Vector2.DistanceSquared(Grid.CellCenter(tile), PlayerGround) > range * range) return true;
+        if (committing || CanPickUp?.Invoke(obj) == false || Vector2.DistanceSquared(Grid.CellCenter(tile), PlayerGround) > range * range) return true;
         bool refund = obj.Definition.Placeable.ConsumeOnPlacement;
         if (refund && !inventory.HasSpaceFor(obj.Definition.QualifiedId, 1, obj.Quality, obj.Durability)) return true;
         committing = true;
@@ -120,6 +132,7 @@ public sealed class PlacementWorld
             Occupancy.Remove(obj); objects.Remove(obj);
             // Non-consuming placement tools already retain their item; removal must not mint another.
             if (refund) inventory.AddItem(obj.Definition.QualifiedId, 1, obj.Quality, obj.Durability);
+            Removed?.Invoke(obj);
         }
         finally { committing = false; }
         return true;
@@ -131,7 +144,7 @@ public sealed class PlacementWorld
         for (int i = 0; i < result.Length; i++)
         {
             PlacementObject obj = objects[i];
-            result[i] = new PlacementSaveEntry { QualifiedItemId = obj.Definition.QualifiedId,
+            result[i] = new PlacementSaveEntry { InstanceId = obj.InstanceId, QualifiedItemId = obj.Definition.QualifiedId,
                 TileX = obj.OriginTile.X, TileY = obj.OriginTile.Y, Rotation = obj.Rotation,
                 Quality = obj.Quality, Durability = obj.Durability };
         }
@@ -153,18 +166,21 @@ public sealed class PlacementWorld
             target.BlocksMovement = source.StaticBlocksMovement;
         }
         var staged = new PlacementWorld(stagingGrid, definitions, BuildEffectRegistry());
+        var ids = new HashSet<string>(StringComparer.Ordinal);
         foreach (PlacementSaveEntry entry in entries)
         {
             if (entry == null || entry.QualifiedItemId == null || !definitions.TryGet(entry.QualifiedItemId, out var definition)
                 || entry.Quality < 0 || entry.Durability < 0
                 || !staged.Validate(definition, new Point(entry.TileX, entry.TileY), entry.Rotation, checkPlayer: false))
                 throw new InvalidOperationException("Saved placement is unknown, blocked, or outside the grid.");
-            var obj = new PlacementObject(definition, new Point(entry.TileX, entry.TileY), entry.Rotation, entry.Quality, entry.Durability);
+            var obj = new PlacementObject(definition, new Point(entry.TileX, entry.TileY), entry.Rotation, entry.Quality, entry.Durability, entry.InstanceId);
+            if (string.IsNullOrWhiteSpace(obj.InstanceId) || !ids.Add(obj.InstanceId)) throw new InvalidOperationException("Duplicate or empty instance ID.");
             staged.Occupancy.Add(obj); staged.objects.Add(obj);
         }
         foreach (var obj in objects) Occupancy.Remove(obj);
         objects.Clear();
         foreach (var obj in staged.objects) { Occupancy.Add(obj); objects.Add(obj); Added?.Invoke(obj); }
+        Restored?.Invoke();
     }
     private Dictionary<string, Action<PlacementObject>> BuildEffectRegistry()
     {

@@ -10,10 +10,10 @@ public sealed class DoorTriggers
 {
     private const int CellSize = 128;
     private readonly Dictionary<Point, Door[]> buckets = new();
-    private readonly Door[] overlaps;
+    private Door[] overlaps;
     private int count;
     private int visit;
-    public Door[] Doors { get; }
+    public Door[] Doors { get; private set; }
     public Door Candidate
     {
         get
@@ -29,6 +29,13 @@ public sealed class DoorTriggers
 
     public DoorTriggers(Door[] doors)
     {
+        Replace(doors);
+    }
+
+    public void Replace(Door[] doors)
+    {
+        Reset();
+        buckets.Clear();
         Doors = (Door[])doors.Clone();
         overlaps = new Door[doors.Length];
         var building = new Dictionary<Point, List<Door>>();
@@ -64,7 +71,7 @@ public sealed class DoorTriggers
         for (int i = count - 1; i >= 0; i--)
         {
             Door door = overlaps[i];
-            if (door.TriggerBounds.Intersects(bounds)) continue;
+            if (Overlaps(door, bounds)) continue;
             door.SuppressedUntilExit = false;
             overlaps[i] = overlaps[--count];
             overlaps[count] = null;
@@ -88,7 +95,7 @@ public sealed class DoorTriggers
                     Door door = nearby[i];
                     if (door.Visit == visit) continue;
                     door.Visit = visit;
-                    if (!door.TriggerBounds.Intersects(bounds)) continue;
+                    if (!Overlaps(door, bounds)) continue;
                     bool present = false;
                     for (int j = 0; j < count; j++)
                         if (ReferenceEquals(overlaps[j], door)) { present = true; break; }
@@ -99,6 +106,10 @@ public sealed class DoorTriggers
                 }
             }
     }
+
+    private static bool Overlaps(Door door, Rectangle bounds) => door.GroundOnly
+        ? door.TriggerBounds.Contains(bounds.Center.X, bounds.Bottom - 1)
+        : door.TriggerBounds.Intersects(bounds);
 
     private static void GetCells(Rectangle bounds, out Point first, out Point last)
     {

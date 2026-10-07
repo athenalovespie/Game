@@ -15,19 +15,21 @@ public sealed class PlaceableData
         PlacementAnchor anchor = PlacementAnchor.BottomCenter, GroundType[] allowedGroundTypes = null,
         bool allowOverlap = false, bool consumeOnPlacement = true, string onPlacedEffect = null,
         bool rotatable = false, float maxRangeTiles = 6f, float spriteScale = 1f,
-        float baseInsetPixels = 0f, float groundOffsetX = 0f)
+        float baseInsetPixels = 0f, float groundOffsetX = 0f, First_game.Interiors.EnterableData enterable = null)
     {
         if (width < 1 || height < 1 || width > 256 || height > 256) throw new ArgumentOutOfRangeException(nameof(width));
         if (string.IsNullOrWhiteSpace(spriteAsset)) throw new ArgumentException("A placed sprite asset is required.");
         if (!float.IsFinite(maxRangeTiles) || maxRangeTiles <= 0 || !float.IsFinite(spriteScale) || spriteScale <= 0
             || !float.IsFinite(baseInsetPixels) || !float.IsFinite(groundOffsetX)) throw new ArgumentOutOfRangeException(nameof(maxRangeTiles));
         if (!Enum.IsDefined(anchor)) throw new ArgumentOutOfRangeException(nameof(anchor));
+        enterable?.ValidateFootprint(width, height); Enterable = enterable;
         Width = width; Height = height; SpriteAsset = spriteAsset; Anchor = anchor;
         allowedGround = new HashSet<GroundType>(allowedGroundTypes ?? new[] { GroundType.Grass, GroundType.Dirt, GroundType.Sand });
         AllowOverlap = allowOverlap; ConsumeOnPlacement = consumeOnPlacement; OnPlacedEffect = onPlacedEffect;
         Rotatable = rotatable; MaxRangeTiles = maxRangeTiles; SpriteScale = spriteScale;
         BaseInsetPixels = baseInsetPixels; GroundOffsetX = groundOffsetX;
     }
+    public First_game.Interiors.EnterableData Enterable { get; }
     public int Width { get; }
     public int Height { get; }
     public string SpriteAsset { get; }

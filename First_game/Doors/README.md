@@ -14,13 +14,14 @@ move the same player and snap camera -> fade in -> release input. A failed desti
 keeps the source area and player position, logs the error, and fades back in.
 Startup preload failures leave the exterior playable with door interaction disabled.
 
-Both areas remain resident. Interior geometry uses the existing white pixel texture;
+The fixed house and exterior remain resident. Lazy placeable rooms use the same transition
+service; see [enterable places](../Interiors/README.md) for their lifecycle and persistence. Interior geometry uses the existing white pixel texture;
 preloading is small synchronous initialization during LoadContent, before play begins.
 There is no disk access, task wait or GPU resource creation during transitions.
 Inactive exterior updates and its respawn clock are paused. Inventory, hotbar, actions
 and the player remain the same objects. This project has no health system to recreate.
 
-The door update, overlap callbacks and successful transitions allocate no managed
+The house door update, overlap callbacks and successful fixed-house transitions allocate no managed
 memory after initialization. DoorChecks measures this over 1,000 warmed-up transitions.
 Existing inventory/actions/renderer code can allocate outside this door path; the test
 is not a claim that the entire application allocates zero bytes. Game1 now reuses its

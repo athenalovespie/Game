@@ -19,6 +19,7 @@ using First_game.Harvesting;
 using System.IO;
 using System.Diagnostics;
 using First_game.Placement;
+using First_game.Interiors;
 
 namespace First_game;
 
@@ -36,6 +37,8 @@ public class Game1 : Core
     private HarvestController harvesting;
     private readonly Random random = new Random(173); // Stable exterior layout for save restoration.
     private Sprite House;
+    private InteriorManager interiors;
+    private InventoryDragController inventoryDrag;
     private PlacementWorld placementWorld;
     private PlacementController placement;
     private PlacementRenderer placementRenderer;
@@ -148,7 +151,7 @@ public class Game1 : Core
         var hotbarBackground = Content.Load<Texture2D>("Images/Hudbar");
         var selectionHighlight = Content.Load<Texture2D>("Images/Highlight");
         var itemSlots = new ItemSlotRenderer(itemDefinitions, itemTextureLoader, hudFont, selectionHighlight);
-        var inventoryDrag = new InventoryDragController();
+        inventoryDrag = new InventoryDragController();
         hotbarPanel = new HotbarPanel(inventory, hotbar, hotbarBackground, itemSlots, inventoryDrag);
 
 
@@ -288,6 +291,10 @@ public class Game1 : Core
         fishing.Register(new FishingSpot(worldGrid, Lake.GetOccupiedCells(), "(O)fish", new FishingSettings()));
         fishingOverlay = new FishingOverlay(gridPixel);
         placementWorld = new PlacementWorld(worldGrid, itemDefinitions);
+        interiors = new InteriorManager(cat, doors, placementWorld,
+            InteriorRegistry.Load(Path.Combine(AppContext.BaseDirectory, "Content", "interiors.json")),
+            itemDefinitions, itemBehaviors);
+        doors.TransitionStarted += CancelTransientInteractions;
         placement = new PlacementController(placementWorld, hotbar, inventory);
         placementRenderer = new PlacementRenderer(placementWorld, itemDefinitions, itemTextureLoader, gridPixel);
         uiManager.TryCancelWorldMode = () => { if (!placement.IsActive) return false; placement.Cancel(); return true; };
@@ -314,6 +321,7 @@ public class Game1 : Core
         var currentKeyboard = Keyboard.GetState();
         var uiInput = new UIInput(currentKeyboard, _previousKeyboard, mouseInput);
         bool wasTransitioning = doors.IsTransitioning;
+        bool actionOwnedInput = cat.Actions.IsBusy;
 
         // Continue sampling input during fades, but consume it without buffering.
         if (!wasTransitioning && IsActive)
@@ -338,7 +346,8 @@ public class Game1 : Core
         if (advanceExterior)
             pickupSystem.Update(worldTime);
 
-        doors.SetInteractionEnabled(!blocked && !cat.Actions.IsBusy);
+        if (!doors.ActiveArea.IsExterior) placement.Cancel();
+        doors.SetInteractionEnabled(!blocked && !actionOwnedInput && !cat.Actions.IsBusy && !placement.IsActive);
         if (!blocked)
         {
             // Resolve movement/trigger exits before E, including an exit on this frame.
@@ -347,7 +356,9 @@ public class Game1 : Core
             if (doors.ActiveArea.IsExterior)
                 fishing.Update(gameTime);
         }
-        doors.SetInteractionEnabled(!blocked && !cat.Actions.IsBusy);
+        doors.SetInteractionEnabled(!blocked && !actionOwnedInput && !cat.Actions.IsBusy && !placement.IsActive);
+        // Capture ownership before placing the last item can end placement mode on this press.
+        bool placementOwnsInteract = placement.IsActive && uiInput.Pressed(cat.Input.Interact);
         doors.Update((float)gameTime.ElapsedGameTime.TotalSeconds, uiInput);
 
         if (!uiManager.PausesWorld && !wasTransitioning && !doors.IsTransitioning)
@@ -356,16 +367,22 @@ public class Game1 : Core
             camera.Update(gameTime);
         }
 
-        bool placementBlocked = blocked || doors.IsTransitioning || mouseOverHotbar || cat.Actions.IsBusy || !doors.ActiveArea.IsExterior;
+        bool placementBlocked = blocked || doors.IsTransitioning || mouseOverHotbar || actionOwnedInput || cat.Actions.IsBusy || !doors.ActiveArea.IsExterior;
         placementWorld.PlayerGround = cat.GroundPosition;
         placementWorld.PlayerBounds = cat.Bounds;
         if (!placementBlocked && uiInput.Pressed(Keys.R)) placement.Rotate();
         placement.Update(mouseInput.GetWorldPosition(camera, GraphicsDevice.Viewport), placementBlocked);
-        if (!placementBlocked && (uiInput.Pressed(Keys.F5) || uiInput.Pressed(Keys.F9)))
+        if (!blocked && !wasTransitioning && !doors.IsTransitioning && !actionOwnedInput && !cat.Actions.IsBusy
+            && (uiInput.Pressed(Keys.F5) || uiInput.Pressed(Keys.F9)))
         {
             HandleWorldSave(uiInput.Pressed(Keys.F5), gameTime.TotalGameTime.TotalSeconds);
             placement.Update(mouseInput.GetWorldPosition(camera, GraphicsDevice.Viewport), blocked: true);
             placementBlocked = true;
+        }
+        if (!placementBlocked && placementOwnsInteract)
+        {
+            placement.TryPrimaryInteract(mouseInput.GetWorldPosition(camera, GraphicsDevice.Viewport));
+            placementBlocked = true; // E and a simultaneous mouse click cannot commit twice.
         }
         if (doors.ActiveArea.IsExterior)
             mouseInteractions.Update(worldTime, GraphicsDevice.Viewport, cat.GroundPosition,
@@ -374,7 +391,7 @@ public class Game1 : Core
         placement.Update(mouseInput.GetWorldPosition(camera, GraphicsDevice.Viewport), placementBlocked);
 
         // A world click may have started an action after the door update.
-        doors.SetInteractionEnabled(!blocked && !doors.IsTransitioning && !cat.Actions.IsBusy);
+        doors.SetInteractionEnabled(!blocked && !doors.IsTransitioning && !actionOwnedInput && !cat.Actions.IsBusy && !placement.IsActive);
 
         _previousKeyboard = currentKeyboard;
         base.Update(gameTime);
@@ -384,13 +401,13 @@ public class Game1 : Core
     {
         try
         {
+            CancelTransientInteractions();
             if (save)
-                WorldSaveStore.Write(WorldSavePath, WorldSaveStore.Capture(inventory, placementWorld, pickupSystem, resources, cat.Position, worldElapsed));
+                WorldSaveStore.Write(WorldSavePath, WorldSaveStore.Capture(inventory, placementWorld, pickupSystem, resources, cat.Position, worldElapsed, interiors));
             else
             {
                 var snapshot = WorldSaveStore.Read(WorldSavePath);
-                WorldSaveStore.Restore(snapshot, inventory, itemDefinitions, itemBehaviors, placementWorld, pickupSystem, resources);
-                cat.Position = new Vector2(snapshot.PlayerX, snapshot.PlayerY);
+                WorldSaveStore.Restore(snapshot, inventory, itemDefinitions, itemBehaviors, placementWorld, pickupSystem, resources, interiors);
                 worldElapsed = TimeSpan.FromSeconds(snapshot.ElapsedSeconds);
                 placement.Cancel(); OnAreaChanged();
             }
@@ -402,6 +419,13 @@ public class Game1 : Core
             Trace.TraceError(error.ToString());
         }
         saveStatusUntil = now + 4;
+    }
+
+    private void CancelTransientInteractions()
+    {
+        inventoryDrag?.Cancel();
+        uiManager.Close();
+        placement?.Cancel();
     }
 
     private void OnAreaChanged()
@@ -419,8 +443,10 @@ public class Game1 : Core
 
     protected override void UnloadContent()
     {
+        interiors?.Dispose();
         if (doors != null)
         {
+            doors.TransitionStarted -= CancelTransientInteractions;
             doors.AreaChanged -= OnAreaChanged;
             doors.Dispose();
         }

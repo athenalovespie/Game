@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using First_game.Interiors;
 using First_game.Entities;
 using First_game.UI;
 using Microsoft.Xna.Framework;
@@ -10,7 +12,7 @@ public sealed class DoorSystem : IDisposable
 {
     private enum TransitionPhase { Idle, FadeOut, FadeIn }
     private readonly Player player;
-    private readonly ResidentArea[] areas;
+    private readonly List<ResidentArea> areas;
     private readonly Action<string> logError;
     private readonly float fadeSeconds;
     private TransitionPhase phase;
@@ -33,10 +35,11 @@ public sealed class DoorSystem : IDisposable
         if (!float.IsFinite(fadeSeconds) || fadeSeconds <= 0)
             throw new ArgumentOutOfRangeException(nameof(fadeSeconds));
         this.player = player;
-        this.areas = (ResidentArea[])areas.Clone();
+        this.areas = new List<ResidentArea>(areas);
         this.fadeSeconds = fadeSeconds;
         this.logError = logError;
         ActiveArea = initialArea;
+        player.MapId = initialArea.Id;
         for (int i = 0; i < areas.Length; i++)
         {
             areas[i].Triggers.Entered += OnOverlapChanged;
@@ -47,6 +50,49 @@ public sealed class DoorSystem : IDisposable
         player.IsMovementBlocked = BlocksMovement;
         RefreshBindings();
         ActiveArea.Triggers.Observe(player.Bounds, spawning: true);
+    }
+
+    public event Action TransitionStarted;
+    public event Action<ResidentArea> OnEnterInterior;
+    public event Action<ResidentArea> OnExitInterior;
+    public IReadOnlyList<ResidentArea> Areas => areas;
+    public void RegisterArea(ResidentArea area)
+    {
+        if (areas.Contains(area)) return;
+        areas.Add(area); area.Triggers.Entered += OnOverlapChanged; area.Triggers.Exited += OnOverlapChanged;
+        RefreshBindings();
+    }
+    public void UnregisterArea(ResidentArea area)
+    {
+        area.Triggers.Entered -= OnOverlapChanged; area.Triggers.Exited -= OnOverlapChanged;
+        areas.Remove(area);
+    }
+    public void RefreshTriggers()
+    {
+        RefreshBindings(); ActiveArea.Triggers.Observe(player.Bounds); RefreshPrompt();
+    }
+    public void RestoreLocation(ResidentArea area, Vector2 position)
+    {
+        if (IsTransitioning || !area.IsReady || area.BlocksMovement(player.BoundsAt(position)))
+            throw new InvalidOperationException("Saved player location is blocked or unavailable.");
+        CommitLocation(area, position, null);
+        RefreshPrompt();
+    }
+    private void CommitLocation(ResidentArea target, Vector2 position, AreaSpawn? spawn)
+    {
+        ResidentArea previous = ActiveArea;
+        ActiveArea.Triggers.Reset(); ActiveArea = target; player.MapId = target.Id;
+        ActiveArea.Triggers.Reset(); placingSpawn = true;
+        player.Position = position;
+        if (spawn.HasValue) player.FaceTowards(player.GroundPosition + spawn.Value.FacingDirection);
+        player.RestoreIdleAnimation(); placingSpawn = false;
+        ActiveArea.Triggers.Observe(player.Bounds, spawning: true);
+        AreaChanged?.Invoke();
+        if (previous != target)
+        {
+            if (!previous.IsExterior) OnExitInterior?.Invoke(previous);
+            if (!target.IsExterior) OnEnterInterior?.Invoke(target);
+        }
     }
 
     private bool BlocksMovement(Rectangle bounds) => ActiveArea.BlocksMovement(bounds);
@@ -61,7 +107,7 @@ public sealed class DoorSystem : IDisposable
     {
         string enter = "Press " + player.Input.Interact + " to enter";
         string exit = "Press " + player.Input.Interact + " to exit";
-        for (int i = 0; i < areas.Length; i++)
+        for (int i = 0; i < areas.Count; i++)
             for (int j = 0; j < areas[i].Triggers.Doors.Length; j++)
             {
                 Door door = areas[i].Triggers.Doors[j];
@@ -99,6 +145,7 @@ public sealed class DoorSystem : IDisposable
             elapsed = 0;
             player.InputLocked = true;
             player.RestoreIdleAnimation();
+            TransitionStarted?.Invoke();
             RefreshPrompt();
             return;
         }
@@ -129,36 +176,31 @@ public sealed class DoorSystem : IDisposable
     private void SwapArea()
     {
         Door door = pendingDoor;
-        ResidentArea target = door.TargetArea;
-        Vector2 position = player.PositionForGround(door.TargetSpawn.GroundPosition);
-        Rectangle bounds = player.BoundsAt(position);
-
-        // Validate before committing anything: failures leave the source area,
-        // player and collision delegate intact, then fade back and release input.
-        if (!target.IsReady || target.BlocksMovement(bounds))
+        PortalDestination destination;
+        Vector2 position;
+        try
         {
-            LastError = door.DestinationError;
+            destination = door.Enterable.Resolve();
+            position = player.PositionForGround(destination.Spawn.GroundPosition);
+            if (destination.Area == null || !destination.Area.IsReady || destination.Area.BlocksMovement(player.BoundsAt(position)))
+                throw new InvalidOperationException(door.DestinationError);
+        }
+        catch (Exception error)
+        {
+            LastError = door.DestinationError + " " + error.Message;
             logError?.Invoke(LastError);
             return;
         }
-
-        ActiveArea.Triggers.Reset();
-        ActiveArea = target;
-        ActiveArea.Triggers.Reset();
-        placingSpawn = true;
-        player.Position = position;
-        player.FaceTowards(player.GroundPosition + door.TargetSpawn.FacingDirection);
-        player.RestoreIdleAnimation();
-        placingSpawn = false;
-        ActiveArea.Triggers.Observe(player.Bounds, spawning: true);
-        AreaChanged?.Invoke();
+        // Commit owner identity before map events so observers see a consistent location.
+        door.Enterable.OnArrived?.Invoke();
+        CommitLocation(destination.Area, position, destination.Spawn);
     }
 
     public void Dispose()
     {
         player.PositionChanged -= OnPlayerMoved;
         player.Input.InteractChanged -= RefreshBindings;
-        for (int i = 0; i < areas.Length; i++)
+        for (int i = 0; i < areas.Count; i++)
         {
             areas[i].Triggers.Entered -= OnOverlapChanged;
             areas[i].Triggers.Exited -= OnOverlapChanged;

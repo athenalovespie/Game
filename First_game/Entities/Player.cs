@@ -46,6 +46,7 @@ public class Player
 
     public Func<Rectangle, bool> IsMovementBlocked { get; set; }
 
+    public string MapId { get; internal set; } = "exterior";
     public bool InputLocked { get; set; }
     public event Action PositionChanged;
 

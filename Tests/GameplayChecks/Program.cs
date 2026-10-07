@@ -127,6 +127,7 @@ static class Checks
         InventoryDragChecks.Run(Check);
         HarvestChecks.Run(Check);
         PlacementChecks.Run(Check);
+        InteriorChecks.Run(Check);
         Console.WriteLine($"{passed} gameplay checks passed.");
     }
 }

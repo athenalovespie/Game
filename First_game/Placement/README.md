@@ -8,11 +8,12 @@ so new entries go in `Inventory/SampleItemCatalog.cs`, following its existing co
 
 ```csharp
 definitions.Register(new ItemDefinition(
-    "(F)tent", "Tent", "Select, then left-click to place. Right-click the footprint to pick up.", "Images/Tent",
+    "(F)tent", "Tent", "Select, then left-click or E to place. Cancel placement before entering.", "Images/Tent",
     ItemCategory.Furniture, maxStackSize: 10, basePrice: 100, spawnerRuleId: "tent_demo_drop",
     placeable: new PlaceableData(5, 3, "Images/Tent",
         allowedGroundTypes: new[] { GroundType.Grass },
-        maxRangeTiles: 6f, spriteScale: .15f, baseInsetPixels: 667f, groundOffsetX: -200f)));
+        maxRangeTiles: 6f, spriteScale: .15f, baseInsetPixels: 667f, groundOffsetX: -200f,
+        enterable: new EnterableData(new Point(2, 2), "tent_small", new Point(3, 2)))));
 ```
 
 The actual entry uses fully qualified placement/ground types. `Images/Tent` is the existing
@@ -45,7 +46,7 @@ left to right. The starting axe is in slot 1, so the demo Tents normally arrive 
    Escape to check cancellation. Escape cancels placement before its usual exit behavior.
    Opening inventory hides/suppresses placement; dragging, closing on release, changing
    menus, and returning while holding the mouse must never place an extra Tent.
-7. While outside with menus closed and no active action, press **F5** to save. Pick up or
+7. With menus closed and no active action, press **F5** to save. Pick up or
    move a Tent, then press **F9**: the saved world and inventory return together. Restart
    and press F9 to verify disk restoration. No automatic load/save occurs on launch/exit.
 
@@ -53,10 +54,12 @@ F5/F9 use `%LOCALAPPDATA%/OurGame/world.json`. The snapshot includes inventory, 
 active pickups, pending respawn deadlines, surviving resource health, player position, and
 exterior elapsed time. Static scenery is reconstructed using a fixed random seed. Saves
 are for this exterior layout/version; changing the world-generation catalog may invalidate
-older saves. Loads that conflict with the world are rejected and rolled back. Saving is
-restricted to the exterior; interior/chest state is not part of this snapshot.
+older saves. Loads that conflict with the world are rejected and rolled back. Saving also works inside the house and Tents. Interior owner/map IDs and stored items
+are included. See [enterable places](../Interiors/README.md) for entry, pickup rules and the demo.
 
 ## Definition options
+
+- `enterable`: optional entrance offset, interior template/spawn and unique/shared state; see `Interiors/README.md`.
 
 - `width`, `height`: positive tile counts (up to 256 on either axis).
 - `spriteAsset`: MonoGame asset name, loaded and cached at startup.

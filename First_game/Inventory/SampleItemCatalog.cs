@@ -6,11 +6,13 @@ public static class SampleItemCatalog
 	{
 		var definitions = new ItemDefinitionRegistry();
         definitions.Register(new ItemDefinition(
-            "(F)tent", "Tent", "Select, then left-click to place. Right-click the footprint to pick up.", "Images/Tent",
+            "(F)tent", "Tent", "Select, then left-click to place. E also places. Escape cancels placement; E at the entrance enters. Right-click to pick up.", "Images/Tent",
             ItemCategory.Furniture, maxStackSize: 10, basePrice: 100, spawnerRuleId: "tent_demo_drop",
             placeable: new First_game.Placement.PlaceableData(5, 3, "Images/Tent",
                 allowedGroundTypes: new[] { First_game.World.GroundType.Grass },
-                maxRangeTiles: 6f, spriteScale: .15f, baseInsetPixels: 667f, groundOffsetX: -200f)));
+                maxRangeTiles: 6f, spriteScale: .15f, baseInsetPixels: 667f, groundOffsetX: -200f,
+                enterable: new First_game.Interiors.EnterableData(new Microsoft.Xna.Framework.Point(2, 2),
+                    "tent_small", new Microsoft.Xna.Framework.Point(3, 2)))));
 		definitions.Register(new ItemDefinition(
 			First_game.Harvesting.HarvestCatalog.BasicAxeId, "Basic Axe",
 			"Select in the hotbar, then left-click a nearby tree.", "Images/Axe_Item",
