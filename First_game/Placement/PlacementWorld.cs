@@ -59,7 +59,7 @@ public sealed class PlacementWorld
     private bool Validate(ItemDefinition definition, Point origin, int rotation, bool checkPlayer)
     {
         PlaceableData data = definition?.Placeable;
-        if (data == null || !data.AllowsRotation(rotation)) return false;
+        if (!PlacementValidity.CanOccupy(Grid, data, origin, rotation)) return false;
         Point size = data.Size(rotation);
         // Check bounds before adding offsets, including hostile/corrupt save coordinates.
         if (origin.X < 0 || origin.Y < 0 || origin.X > Grid.Columns - size.X || origin.Y > Grid.Rows - size.Y) return false;
@@ -67,8 +67,6 @@ public sealed class PlacementWorld
         for (int y = 0; y < size.Y; y++) for (int x = 0; x < size.X; x++)
         {
             Point tile = origin + new Point(x, y);
-            GridCell cell = Grid.GetCell(tile);
-            if (cell.PlacementForbidden || !data.AllowsGround(cell.Ground) || (!data.AllowOverlap && (cell.IsOccupied() || cell.BlocksMovement))) return false;
             if (!checkPlayer) continue;
             Vector2 topLeft = Grid.CellToWorld(tile);
             if (Vector2.DistanceSquared(Grid.CellCenter(tile), PlayerGround) > range * range

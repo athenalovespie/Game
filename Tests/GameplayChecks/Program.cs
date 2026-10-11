@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using First_game.Actions;
 using First_game.Entities;
 using First_game.Fishing;
@@ -128,6 +128,7 @@ static class Checks
         HarvestChecks.Run(Check);
         PlacementChecks.Run(Check);
         InteriorChecks.Run(Check);
+        RegrowingChecks.Run(Check);
         Console.WriteLine($"{passed} gameplay checks passed.");
     }
 }

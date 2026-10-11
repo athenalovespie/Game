@@ -6,7 +6,7 @@ namespace First_game.Doors;
 
 public readonly record struct AreaSpawn(Vector2 GroundPosition, Vector2 FacingDirection);
 
-public sealed class Door
+public sealed class Door : First_game.Input.ISpatialTrigger
 {
     public Enterable Enterable { get; }
     public bool GroundOnly { get; }
@@ -25,8 +25,8 @@ public sealed class Door
         DestinationError = "Door '" + id + "' destination unavailable or spawn blocked.";
     }
 
-    internal bool SuppressedUntilExit;
-    internal int Visit;
+    public bool SuppressedUntilExit { get; set; }
+    public int Visit { get; set; }
 
     public Door(string id, Rectangle triggerBounds, ResidentArea targetArea,
         AreaSpawn targetSpawn, bool isExit)

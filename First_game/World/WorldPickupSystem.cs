@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -10,7 +10,9 @@ namespace First_game.World;
 
 public sealed class WorldPickupSystem
 {
-	private const int PlacementAttempts = 16;
+	public First_game.Regrowing.HarvestableManager Harvestables { get; set; }
+    public string MapId { get; set; } = "exterior";
+    private const int PlacementAttempts = 16;
 	private const int PlacementRadius = 2;
 	private readonly WorldGrid _grid;
 	private readonly ItemDefinitionRegistry _items;
@@ -131,6 +133,7 @@ public sealed class WorldPickupSystem
         {
             ValidateEntry(entry);
             var rule = _rules.GetRequired(entry.RuleId);
+            if (rule.HarvestableTypeId != null) continue; // Migrated by WorldSaveStore.
             Point tile = new(entry.TileX, entry.TileY);
             if (entry.Count < 1 || entry.Count > _items.GetRequired(rule.QualifiedItemId).MaxStackSize
                 || !_grid.IsValidCell(tile) || !occupied.Add(tile)
@@ -142,6 +145,7 @@ public sealed class WorldPickupSystem
         foreach (var entry in snapshot.Active)
         {
             var rule = _rules.GetRequired(entry.RuleId);
+            if (rule.HarvestableTypeId != null) continue;
             var definition = _items.GetRequired(rule.QualifiedItemId);
             Point tile = new(entry.TileX, entry.TileY);
             var pickup = _pickupPool.Count == 0 ? new WorldPickup() : _pickupPool.Pop();
@@ -152,6 +156,7 @@ public sealed class WorldPickupSystem
         foreach (var entry in snapshot.Pending)
         {
             var rule = _rules.GetRequired(entry.RuleId);
+            if (rule.HarvestableTypeId != null) continue;
             _respawns.Enqueue(new RespawnRequest(new WorldSpawnNode(rule.NodeType, new Vector2(entry.NodeX, entry.NodeY)), rule), entry.Due);
         }
     }
@@ -166,7 +171,15 @@ public sealed class WorldPickupSystem
 	{
 		IReadOnlyList<WorldSpawnRule> rules = _rules.GetForNode(node.NodeType);
 		for (int ruleIndex = 0; ruleIndex < rules.Count; ruleIndex++)
-			SpawnRuleAtNode(node, rules[ruleIndex], 0d);
+        {
+            var rule = rules[ruleIndex];
+            if (rule.HarvestableTypeId != null)
+            {
+                if (Harvestables == null) throw new InvalidOperationException("Harvestable spawns require a manager.");
+                Harvestables.RegisterNode(MapId, node, rule);
+            }
+            else SpawnRuleAtNode(node, rule, 0d);
+        }
 	}
 
 	private bool SpawnRuleAtNode(WorldSpawnNode node, WorldSpawnRule rule, double now)

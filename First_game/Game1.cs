@@ -20,6 +20,7 @@ using System.IO;
 using System.Diagnostics;
 using First_game.Placement;
 using First_game.Interiors;
+using First_game.Regrowing;
 
 namespace First_game;
 
@@ -33,6 +34,8 @@ public class Game1 : Core
     private SpriteFont hudFont;
     private Camera2D camera;
     private readonly WorldRenderer worldRenderer = new WorldRenderer();
+    private HarvestableManager regrowing;
+    private HarvestableInteraction plantInteraction;
     private ResourceWorld resources;
     private HarvestController harvesting;
     private readonly Random random = new Random(173); // Stable exterior layout for save restoration.
@@ -136,6 +139,11 @@ public class Game1 : Core
         resources = new ResourceWorld(worldGrid);
         var spawnRules = new WorldSpawnRuleRegistry(itemDefinitions);
         WorldSpawnCatalog.RegisterRules(spawnRules);
+        var plantDefinitions = new HarvestableRegistry(itemDefinitions, itemTextureLoader);
+        var plantNodes = HarvestableCatalog.Load(Path.Combine(AppContext.BaseDirectory, "Content", "harvestables.json"),
+            plantDefinitions, spawnRules);
+        regrowing = new HarvestableManager(plantDefinitions, spawnRules, random);
+        regrowing.RegisterMap("exterior", worldGrid);
         pickupSystem = new WorldPickupSystem(
             worldGrid,
             itemDefinitions,
@@ -244,7 +252,13 @@ public class Game1 : Core
         doorOverlay = new DoorOverlay(doors, gridPixel, inventoryPanel);
         doors.AreaChanged += OnAreaChanged;
 
+        regrowing.IntersectsActor = (map, bounds) => cat.MapId == map && cat.Bounds.Intersects(bounds);
+        pickupSystem.Harvestables = regrowing;
         pickupSystem.RegisterNodes(WorldSpawnCatalog.CreateNodes());
+        pickupSystem.RegisterNodes(plantNodes);
+        regrowing.RebuildTriggers();
+        plantInteraction = new HarvestableInteraction(regrowing, cat, doors, inventory);
+        doors.AdditionalMovementBlocked = regrowing.BlocksMovement;
 
         for (int treeIndex = 0; treeIndex < 10; treeIndex++)
         {
@@ -336,7 +350,9 @@ public class Game1 : Core
             || GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed)
             Exit();
 
-        // The inactive exterior retains its objects and its exact respawn clock.
+        // Plants use elapsed gameplay across all maps; pause and focus loss freeze this clock.
+        regrowing.Advance(gameTime.ElapsedGameTime.TotalSeconds, uiManager.PausesWorld || !IsActive || wasTransitioning);
+        // Loose pickup timers retain their previous exterior-only clock.
         bool advanceExterior = doors.ActiveArea.IsExterior
             && !wasTransitioning && !uiManager.PausesWorld;
         if (advanceExterior)
@@ -359,6 +375,10 @@ public class Game1 : Core
         doors.SetInteractionEnabled(!blocked && !actionOwnedInput && !cat.Actions.IsBusy && !placement.IsActive);
         // Capture ownership before placing the last item can end placement mode on this press.
         bool placementOwnsInteract = placement.IsActive && uiInput.Pressed(cat.Input.Interact);
+        bool plantOwnsInteract = plantInteraction.TryInteract(uiInput,
+            !blocked && !mouseOverHotbar && !actionOwnedInput && !cat.Actions.IsBusy && !placement.IsActive
+            && !uiInput.Pressed(Keys.F5) && !uiInput.Pressed(Keys.F9));
+        if (plantOwnsInteract) doors.SetInteractionEnabled(false);
         doors.Update((float)gameTime.ElapsedGameTime.TotalSeconds, uiInput);
 
         if (!uiManager.PausesWorld && !wasTransitioning && !doors.IsTransitioning)
@@ -367,7 +387,7 @@ public class Game1 : Core
             camera.Update(gameTime);
         }
 
-        bool placementBlocked = blocked || doors.IsTransitioning || mouseOverHotbar || actionOwnedInput || cat.Actions.IsBusy || !doors.ActiveArea.IsExterior;
+        bool placementBlocked = plantOwnsInteract || blocked || doors.IsTransitioning || mouseOverHotbar || actionOwnedInput || cat.Actions.IsBusy || !doors.ActiveArea.IsExterior;
         placementWorld.PlayerGround = cat.GroundPosition;
         placementWorld.PlayerBounds = cat.Bounds;
         if (!placementBlocked && uiInput.Pressed(Keys.R)) placement.Rotate();
@@ -403,11 +423,11 @@ public class Game1 : Core
         {
             CancelTransientInteractions();
             if (save)
-                WorldSaveStore.Write(WorldSavePath, WorldSaveStore.Capture(inventory, placementWorld, pickupSystem, resources, cat.Position, worldElapsed, interiors));
+                WorldSaveStore.Write(WorldSavePath, WorldSaveStore.Capture(inventory, placementWorld, pickupSystem, resources, cat.Position, worldElapsed, interiors, regrowing));
             else
             {
                 var snapshot = WorldSaveStore.Read(WorldSavePath);
-                WorldSaveStore.Restore(snapshot, inventory, itemDefinitions, itemBehaviors, placementWorld, pickupSystem, resources, interiors);
+                WorldSaveStore.Restore(snapshot, inventory, itemDefinitions, itemBehaviors, placementWorld, pickupSystem, resources, interiors, regrowing);
                 worldElapsed = TimeSpan.FromSeconds(snapshot.ElapsedSeconds);
                 placement.Cancel(); OnAreaChanged();
             }
@@ -443,6 +463,7 @@ public class Game1 : Core
 
     protected override void UnloadContent()
     {
+        plantInteraction?.Dispose();
         interiors?.Dispose();
         if (doors != null)
         {
@@ -477,6 +498,7 @@ public class Game1 : Core
             worldRenderer.Submit(House.SortY, House.Draw);
             placementRenderer.SubmitDraw(worldRenderer);
             resources.SubmitDraw(worldRenderer);
+            regrowing.SubmitDraw(worldRenderer, cat.MapId);
             pickupSystem.SubmitDraw(worldRenderer);
             worldRenderer.Submit(cat.Bounds.Bottom, cat.Draw);
             worldRenderer.Draw(SpriteBatch);
@@ -487,7 +509,9 @@ public class Game1 : Core
         else
         {
             doors.ActiveArea.Draw(SpriteBatch, gridPixel);
-            cat.Draw(SpriteBatch);
+            regrowing.SubmitDraw(worldRenderer, cat.MapId);
+            worldRenderer.Submit(cat.Bounds.Bottom, cat.Draw);
+            worldRenderer.Draw(SpriteBatch);
         }
 
         SpriteBatch.End();

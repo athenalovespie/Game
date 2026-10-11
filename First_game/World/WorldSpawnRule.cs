@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 
 namespace First_game.World;
 
@@ -11,7 +11,8 @@ public sealed class WorldSpawnRule
 		float chance,
 		int minimumCount,
 		int maximumCount,
-		double respawnSeconds)
+		double respawnSeconds,
+        string harvestableTypeId = null)
 	{
 		if (string.IsNullOrWhiteSpace(ruleId))
 			throw new ArgumentException("A rule ID is required.", nameof(ruleId));
@@ -19,11 +20,11 @@ public sealed class WorldSpawnRule
 			throw new ArgumentException("A node type is required.", nameof(nodeType));
 		if (string.IsNullOrWhiteSpace(qualifiedItemId))
 			throw new ArgumentException("A qualified item ID is required.", nameof(qualifiedItemId));
-		if (chance < 0f || chance > 1f)
+		if (!float.IsFinite(chance) || chance < 0f || chance > 1f)
 			throw new ArgumentOutOfRangeException(nameof(chance));
-		if (minimumCount < 1 || maximumCount < minimumCount)
+		if (minimumCount < 1 || maximumCount < minimumCount || maximumCount == int.MaxValue)
 			throw new ArgumentOutOfRangeException(nameof(minimumCount));
-		if (respawnSeconds < 0d)
+		if (!double.IsFinite(respawnSeconds) || respawnSeconds < 0d)
 			throw new ArgumentOutOfRangeException(nameof(respawnSeconds));
 
 		RuleId = ruleId;
@@ -33,9 +34,11 @@ public sealed class WorldSpawnRule
 		MinimumCount = minimumCount;
 		MaximumCount = maximumCount;
 		RespawnSeconds = respawnSeconds;
+        HarvestableTypeId = harvestableTypeId;
 	}
 
-	public string RuleId { get; }
+	public string HarvestableTypeId { get; }
+    public string RuleId { get; }
 	public string NodeType { get; }
 	public string QualifiedItemId { get; }
 	public float Chance { get; }

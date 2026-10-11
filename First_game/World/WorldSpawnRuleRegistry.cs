@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using First_game.Inventory;
 
@@ -20,9 +20,9 @@ public sealed class WorldSpawnRuleRegistry
 		if (rule == null)
 			throw new ArgumentNullException(nameof(rule));
 		ItemDefinition item = _items.GetRequired(rule.QualifiedItemId);
-		if (!string.Equals(item.SpawnerRuleId, rule.RuleId, StringComparison.Ordinal))
+		if (rule.HarvestableTypeId == null && !string.Equals(item.SpawnerRuleId, rule.RuleId, StringComparison.Ordinal))
 			throw new InvalidOperationException($"Item '{item.QualifiedId}' does not reference spawn rule '{rule.RuleId}'.");
-		if (rule.MaximumCount > item.MaxStackSize)
+		if (rule.HarvestableTypeId == null && rule.MaximumCount > item.MaxStackSize)
 			throw new InvalidOperationException($"Spawn rule '{rule.RuleId}' can exceed its item's stack limit.");
 		if (!_byId.TryAdd(rule.RuleId, rule))
 			throw new InvalidOperationException($"Spawn rule '{rule.RuleId}' is already registered.");

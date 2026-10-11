@@ -1,10 +1,11 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Text.Json;
 using First_game.Harvesting;
 using First_game.Interiors;
 using First_game.Inventory;
 using First_game.Placement;
+using First_game.Regrowing;
 using Microsoft.Xna.Framework;
 using PlayerInventory = First_game.Inventory.Inventory;
 
@@ -15,7 +16,8 @@ public static class WorldSaveStore
 {
     public sealed class Snapshot
     {
-        public int Version { get; set; } = 2;
+        public int Version { get; set; } = 3;
+        public HarvestableSnapshot Harvestables { get; set; }
         public InteriorSnapshot Interiors { get; set; }
         public string Inventory { get; set; }
         public PlacementSaveEntry[] Placements { get; set; }
@@ -26,7 +28,8 @@ public static class WorldSaveStore
         public float PlayerY { get; set; }
     }
     public static Snapshot Capture(PlayerInventory inventory, PlacementWorld placements, WorldPickupSystem pickups,
-        ResourceWorld resources, Vector2 playerPosition, TimeSpan elapsed, InteriorManager interiors = null) => new() {
+        ResourceWorld resources, Vector2 playerPosition, TimeSpan elapsed, InteriorManager interiors = null, HarvestableManager harvestables = null) => new() {
+            Harvestables = harvestables?.Capture(),
             Interiors = interiors?.Capture(),
             Inventory = inventory.SaveToJson(), Placements = placements.Capture(), Pickups = pickups.Capture(),
             Resources = resources.Capture(), PlayerX = playerPosition.X, PlayerY = playerPosition.Y, ElapsedSeconds = elapsed.TotalSeconds };
@@ -41,28 +44,33 @@ public static class WorldSaveStore
     public static Snapshot Read(string path) => JsonSerializer.Deserialize<Snapshot>(File.ReadAllText(path));
 
     public static void Restore(Snapshot snapshot, PlayerInventory inventory, ItemDefinitionRegistry definitions,
-        ItemCategoryBehaviorRegistry behaviors, PlacementWorld placements, WorldPickupSystem pickups, ResourceWorld resources, InteriorManager interiors = null)
+        ItemCategoryBehaviorRegistry behaviors, PlacementWorld placements, WorldPickupSystem pickups, ResourceWorld resources, InteriorManager interiors = null, HarvestableManager harvestables = null)
     {
-        if (snapshot == null || (snapshot.Version != 1 && snapshot.Version != 2) || !float.IsFinite(snapshot.PlayerX) || !float.IsFinite(snapshot.PlayerY)
+        if (snapshot == null || (snapshot.Version < 1 || snapshot.Version > 3) || !float.IsFinite(snapshot.PlayerX) || !float.IsFinite(snapshot.PlayerY)
             || !double.IsFinite(snapshot.ElapsedSeconds) || snapshot.ElapsedSeconds < 0
             || snapshot.ElapsedSeconds > TimeSpan.MaxValue.TotalSeconds)
             throw new InvalidOperationException("Invalid world save.");
-        if (snapshot.Version == 2 && interiors != null && snapshot.Interiors == null)
-            throw new InvalidOperationException("Version-2 saves require interior location data.");
+        if (snapshot.Version >= 2 && interiors != null && snapshot.Interiors == null)
+            throw new InvalidOperationException("Version-2+ saves require interior location data.");
+        if (snapshot.Version >= 3 && harvestables != null && snapshot.Harvestables == null)
+            throw new InvalidOperationException("Version-3 saves require harvestable data.");
         // Validate inventory before changing the world; retain a full rollback for spatial conflicts.
         _ = PlayerInventory.LoadFromJson(snapshot.Inventory, definitions, behaviors);
-        var previous = Capture(inventory, placements, pickups, resources, interiors?.PlayerPosition ?? Vector2.Zero, TimeSpan.Zero, interiors);
-        try { Apply(snapshot, inventory, placements, pickups, resources, interiors); }
-        catch { Apply(previous, inventory, placements, pickups, resources, interiors); throw; }
+        var previous = Capture(inventory, placements, pickups, resources, interiors?.PlayerPosition ?? Vector2.Zero, TimeSpan.Zero, interiors, harvestables);
+        try { Apply(snapshot, inventory, placements, pickups, resources, interiors, harvestables); }
+        catch { Apply(previous, inventory, placements, pickups, resources, interiors, harvestables); throw; }
     }
     private static void Apply(Snapshot snapshot, PlayerInventory inventory, PlacementWorld placements,
-        WorldPickupSystem pickups, ResourceWorld resources, InteriorManager interiors)
+        WorldPickupSystem pickups, ResourceWorld resources, InteriorManager interiors, HarvestableManager harvestables)
     {
         placements.Restore(Array.Empty<PlacementSaveEntry>());
         pickups.Clear();
+        harvestables?.Clear();
         resources.Restore(snapshot.Resources);
         pickups.Restore(snapshot.Pickups);
         placements.Restore(snapshot.Placements);
+        if (harvestables != null)
+            harvestables.Restore(snapshot.Harvestables ?? harvestables.MigratePickups(snapshot.Pickups, snapshot.ElapsedSeconds));
         inventory.RestoreFromJson(snapshot.Inventory);
         interiors?.Restore(snapshot.Interiors, new Vector2(snapshot.PlayerX, snapshot.PlayerY));
     }

@@ -1,0 +1,18 @@
+﻿{
+  "Plants": [{
+    "Id": "blackberry_bush",
+    "Width": 3, "Height": 1, "SpriteScale": 0.2,
+    "States": [
+      { "Id": "ripe", "SpriteAsset": "Images/BlackBerryBush1" },
+      { "Id": "empty", "SpriteAsset": "Images/Bush1" }
+    ],
+    "Yield": { "QualifiedItemId": "(O)blackberry", "Minimum": 1, "Maximum": 3 },
+    "RipeState": "ripe", "AfterHarvestState": "empty", "RegrowSeconds": 60,
+    "PromptText": "harvest blackberries", "RangePixels": 140,
+    "Spawns": [{
+      "RuleId": "blackberry_bush_drop", "NodeType": "blackberry_bush",
+      "Chance": 0.85, "RetrySeconds": 90, "Count": 5,
+      "MinimumX": -600, "MinimumY": 400, "MaximumX": 1200, "MaximumY": 1600
+    }]
+  }]
+}

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using First_game.Interiors;
 using First_game.Entities;
@@ -73,7 +73,8 @@ public sealed class DoorSystem : IDisposable
     }
     public void RestoreLocation(ResidentArea area, Vector2 position)
     {
-        if (IsTransitioning || !area.IsReady || area.BlocksMovement(player.BoundsAt(position)))
+        if (IsTransitioning || !area.IsReady || area.BlocksMovement(player.BoundsAt(position))
+            || AdditionalMovementBlocked?.Invoke(area.Id, player.BoundsAt(position)) == true)
             throw new InvalidOperationException("Saved player location is blocked or unavailable.");
         CommitLocation(area, position, null);
         RefreshPrompt();
@@ -95,7 +96,9 @@ public sealed class DoorSystem : IDisposable
         }
     }
 
-    private bool BlocksMovement(Rectangle bounds) => ActiveArea.BlocksMovement(bounds);
+    public Func<string, Rectangle, bool> AdditionalMovementBlocked { get; set; }
+    private bool BlocksMovement(Rectangle bounds) => ActiveArea.BlocksMovement(bounds)
+        || AdditionalMovementBlocked?.Invoke(ActiveArea.Id, bounds) == true;
     private void OnPlayerMoved()
     {
         if (!placingSpawn) ActiveArea.Triggers.Observe(player.Bounds);
@@ -182,7 +185,8 @@ public sealed class DoorSystem : IDisposable
         {
             destination = door.Enterable.Resolve();
             position = player.PositionForGround(destination.Spawn.GroundPosition);
-            if (destination.Area == null || !destination.Area.IsReady || destination.Area.BlocksMovement(player.BoundsAt(position)))
+            if (destination.Area == null || !destination.Area.IsReady || destination.Area.BlocksMovement(player.BoundsAt(position))
+                || AdditionalMovementBlocked?.Invoke(destination.Area.Id, player.BoundsAt(position)) == true)
                 throw new InvalidOperationException(door.DestinationError);
         }
         catch (Exception error)
